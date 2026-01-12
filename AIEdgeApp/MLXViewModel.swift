@@ -18,7 +18,7 @@ import MLX
 
 @MainActor
 @Observable
-class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
+class MLXViewModel: NSObject {
     /// The model configuration. It can be a LLM or VLM
     ///
     /// You can checkout MLXLLM.ModelRegistry or MLXVLM.ModelRegistry
@@ -94,20 +94,13 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
     /// Uses app's document directory which is always accessible on iOS
     private var hub: HubApi
 
-    /// Speech synthesizer for text-to-speech
-    private let speechSynthesizer = AVSpeechSynthesizer()
-    
-    /// Whether speech is currently enabled
-    var isSpeechEnabled = false
-    
-    /// Whether speech is currently speaking
-    var isSpeaking = false
+    /// Whether web search is enabled
+    var isSearchEnabled = true
+
     
     /// Explicitly unloads the current model from memory
     func unloadModel() {
         print("DEBUG: unloadModel called")
-        // Stop any ongoing speech
-        stopSpeaking()
         
         // Drop the model container so its memory can be reclaimed
         modelContainer = nil
@@ -167,7 +160,7 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
         }
         
         // Set delegate after super.init()
-        speechSynthesizer.delegate = self
+       // speechSynthesizer.delegate = self
         
         // Ensure the download directory exists (now safe to call after super.init())
         createDownloadDirectoryIfNeeded()
@@ -414,10 +407,12 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
 
         // 1. Inject System Prompt if new conversation
         if self.messages.isEmpty {
-            self.messages.append([
-                "role": "system",
-                "content": self.searchSystemPrompt
-            ])
+            if isSearchEnabled {
+                self.messages.append([
+                    "role": "system",
+                    "content": self.searchSystemPrompt
+                ])
+            }
         }
 
         // 2. Add User Message
@@ -440,13 +435,18 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
         
         // Memory Optimization: Prune history if it gets too long
         // Keep system prompt + last 6 messages (3 turns)
+        // Memory Optimization: Prune history if it gets too long
+        // Keep system prompt + last 6 messages (3 turns)
         if self.messages.count > 10 {
-           let systemPrompt = self.messages.first
+           let firstMessage = self.messages.first
            let suffix = self.messages.suffix(6)
            self.messages = []
-           if let sys = systemPrompt {
-               self.messages.append(sys)
+           
+           // Only preserve the first message if it's a System prompt
+            if let first = firstMessage, first["role"] as! String == "system" {
+               self.messages.append(first)
            }
+           
            self.messages.append(contentsOf: suffix)
            print("DEBUG: Pruned conversation history to save memory")
         }
@@ -497,7 +497,9 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
                 let messagesSnapshot = currentMessages
                 
                 // Run generation on background thread to prevent UI freezing
-                try await Task.detached(priority: .userInitiated) {
+                // Run generation on background thread to prevent UI freezing
+                currentOutput = try await Task.detached(priority: .userInitiated) {
+                    var finalOutput = ""
                     try await container.perform { context in
                         // Create user input
                         var userInput = UserInput(messages: messagesSnapshot)
@@ -515,8 +517,8 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
                             if Task.isCancelled { return .stop }
                             
                             let text = context.tokenizer.decode(tokens: tokens)
+                            finalOutput = text
                             
-                            currentOutput = text
                             Task { @MainActor in
                                 self.output = text
                                 
@@ -536,6 +538,7 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
                         // Capture stats
                         Task { @MainActor in self.tokensPerSecond = result.tokensPerSecond }
                     }
+                    return finalOutput
                 }.value
             } catch {
                 print("DEBUG: Generation error: \(error)")
@@ -553,8 +556,8 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
             // Logic Check (Search vs Final)
              let trimmedOutput = currentOutput.trimmingCharacters(in: .whitespacesAndNewlines)
             
-            if trimmedOutput.hasPrefix("SEARCH:") {
-                let query = String(trimmedOutput.dropFirst("SEARCH:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+            if let range = trimmedOutput.range(of: "SEARCH:") {
+                let query = String(trimmedOutput[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
                 
                 await MainActor.run {
                     Swift.print("DEBUG: Model requested search: \(query)")
@@ -649,9 +652,21 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
                     "content": currentOutput
                 ])
                 
-                if self.isSpeechEnabled && !currentOutput.isEmpty {
-                    self.speak(text: currentOutput)
-                }
+                     
+                if self.chatHistory.last?.role == .assistant {
+                     // It's already there, just ensure isStreaming is false
+                     var lastBubble = self.chatHistory[self.chatHistory.count - 1]
+                     lastBubble.isStreaming = false
+                     self.chatHistory[self.chatHistory.count - 1] = lastBubble
+                 } else {
+                     // Should not happen usually if streaming, but safe fallback
+                     self.chatHistory.append(ChatBubble(role: .assistant, content: currentOutput, isStreaming: false))
+                 }
+                 
+                self.messages.append([
+                    "role": "assistant",
+                    "content": currentOutput
+                ])
             }
             
             shouldContinue = false
@@ -685,31 +700,8 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
         }
     }
 
-    /// Speaks the given text using AVSpeechSynthesizer
-    func speak(text: String) {
-        // Stop any current speech
-        stopSpeaking()
-        
-        guard !text.isEmpty else { return }
-        
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: "en-US") // or "en-GB" for British
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        utterance.pitchMultiplier = 1.0
-        utterance.volume = 1.0
-        
-        speechSynthesizer.speak(utterance)
-        isSpeaking = true
-    }
+    // Speech methods removed
     
-    /// Stops any ongoing speech
-    func stopSpeaking() {
-        if speechSynthesizer.isSpeaking {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-        }
-        isSpeaking = false
-    }
-
     /// Creates ``UserInput.Prompt`` from prompt string and images
     ///
     /// If images is empty, return ``UserInput.Prompt/text`` case with the prompt.
@@ -717,17 +709,6 @@ class MLXViewModel: NSObject, AVSpeechSynthesizerDelegate {
     /// Otherwise, it will create messages in Qwen2 VL format and return ``UserInput.Prompt/messages``.
 
 
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            isSpeaking = false
-        }
-    }
-    
-    nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        Task { @MainActor in
-            isSpeaking = false
-        }
-    }
     
     /// Gets the list of all downloaded model directories
     func getDownloadedModels() -> [(name: String, path: URL, size: Int64)] {

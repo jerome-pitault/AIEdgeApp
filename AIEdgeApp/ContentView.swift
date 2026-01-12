@@ -106,26 +106,16 @@ struct ContentView: View {
                         Image(systemName: "photo.badge.plus")
                     }
                     
-                    // Speech toggle button
+                    // Search toggle button
                     Button {
-                        vm.isSpeechEnabled.toggle()
-                        if !vm.isSpeechEnabled {
-                            vm.stopSpeaking()
-                        }
+                        vm.isSearchEnabled.toggle()
                     } label: {
-                        Image(systemName: vm.isSpeechEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
-                            .foregroundColor(vm.isSpeechEnabled ? .blue : .gray)
+                        Image(systemName: vm.isSearchEnabled ? "globe" : "globe.slash") // Using globe to represent web search
+                            .foregroundColor(vm.isSearchEnabled ? .green : .gray)
                     }
                     
                     // Stop speech button (only show when speaking)
-                    if vm.isSpeaking {
-                        Button {
-                            vm.stopSpeaking()
-                        } label: {
-                            Image(systemName: "stop.circle.fill")
-                                .foregroundColor(.red)
-                        }
-                    }
+
 
                     TextField("Prompt", text: $prompt)
                         .textFieldStyle(.roundedBorder)
