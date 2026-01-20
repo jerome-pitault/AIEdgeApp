@@ -16,6 +16,12 @@ internal import Tokenizers
 import os
 import MLX
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
+
+
 @MainActor
 @Observable
 class MLXViewModel: NSObject {
@@ -58,6 +64,9 @@ class MLXViewModel: NSObject {
     
     /// Any error message occured while the generate process.
     var errorMessage: String?
+    
+    /// Track the background generation task explicitly for cancellation
+    private var currentGenerationTask: Task<String, Error>?
 
     /// The conversation history for the LLM context
     var messages: [Message] = []
@@ -96,6 +105,9 @@ class MLXViewModel: NSObject {
 
     /// Whether web search is enabled
     var isSearchEnabled = true
+    
+    /// Flag to track if we need to reload the model when returning to foreground
+    private var shouldReloadOnForeground = false
 
     
     /// Explicitly unloads the current model from memory
@@ -164,10 +176,55 @@ class MLXViewModel: NSObject {
         
         // Ensure the download directory exists (now safe to call after super.init())
         createDownloadDirectoryIfNeeded()
+        // Ensure the download directory exists (now safe to call after super.init())
+        createDownloadDirectoryIfNeeded()
+        
+        // Setup lifecycle and memory monitoring
+        setupLifecycleObservers()
+    }
+    
+    private func setupLifecycleObservers() {
+        #if os(iOS)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleBackground), name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
+        #endif
+    }
+    
+    @objc private func handleBackground() {
+        print("App entering background. Unloading model to save memory.")
+        // Only unload if we actually have a model loaded
+        if modelContainer != nil {
+            stop() // Stop generating if running
+            // Don't full unloadModel() because we want to keep chat history!
+            // We just want to drop the weights.
+            unloadModelResourcesOnly()
+            shouldReloadOnForeground = true
+        }
+    }
+    
+    @objc private func handleForeground() {
+        print("App entering foreground.")
+        if shouldReloadOnForeground {
+            print("Restoring model from background state...")
+            shouldReloadOnForeground = false
+            Task {
+                await loadModel()
+            }
+        }
+    }
+    
+    /// Unloads ONLY the heavy model weights but keeps chat history
+    func unloadModelResourcesOnly() {
+        modelContainer = nil
+        MLX.GPU.clearCache()
+        tokensPerSecond = 0
+        isRunning = false
+        // intentionally NOT clearing messages/chatHistory
     }
     
     deinit {
         print("DEBUG: MLXViewModel DEINIT")
+        NotificationCenter.default.removeObserver(self)
     }
     
     override init() {
@@ -496,6 +553,14 @@ class MLXViewModel: NSObject {
         // 3. Start Recursive Generation Loop
         await generateResponse(images: modelInputImages)
     }
+    
+    /// Stops the current generation process immediately
+    func stop() {
+        print("DEBUG: User requested stop. Cancelling generation task.")
+        self.isRunning = false
+        self.currentGenerationTask?.cancel()
+        self.currentGenerationTask = nil
+    }
 
     /// Internal function to handle the generate -> tool -> generate loop iteratively
     /// Memory Optimized: Uses separate perform steps and aggressive cleanup
@@ -534,8 +599,7 @@ class MLXViewModel: NSObject {
                 let messagesSnapshot = currentMessages
                 
                 // Run generation on background thread to prevent UI freezing
-                // Run generation on background thread to prevent UI freezing
-                currentOutput = try await Task.detached(priority: .userInitiated) {
+                let task = Task.detached(priority: .userInitiated) {
                     var finalOutput = ""
                     try await container.perform { context in
                         // FIX: Cumulative Image Collection
@@ -585,7 +649,7 @@ class MLXViewModel: NSObject {
                         
                         // Generate output
                         let result = try MLXLMCommon.generate(input: input, parameters: .init(), context: context) { tokens in
-                            // Critical: Stop if the task (and thus the model usage) is cancelled
+                            // Critical: Stop if the task is cancelled
                             if Task.isCancelled { return .stop }
                             
                             let text = context.tokenizer.decode(tokens: tokens)
@@ -604,6 +668,16 @@ class MLXViewModel: NSObject {
                                 }
                             }
                             
+                            // FIX: Handle missing EOS token for Gemma models and detect SEARCH command
+                            if text.contains("<end of turn>") || text.contains("<end_of_turn>") {
+                                return .stop
+                            }
+                            
+                            // FIX: Detect SEARCH command but wait for the complete line (newline)
+                            if let searchRange = text.range(of: "SEARCH:"), text[searchRange.upperBound...].contains("\n") {
+                                return .stop
+                            }
+                            
                             return .more
                         }
                         
@@ -611,7 +685,9 @@ class MLXViewModel: NSObject {
                         Task { @MainActor in self.tokensPerSecond = result.tokensPerSecond }
                     }
                     return finalOutput
-                }.value
+                }
+                self.currentGenerationTask = task
+                currentOutput = try await task.value
             } catch {
                 print("DEBUG: Generation error: \(error)")
                 Task { @MainActor in
@@ -623,7 +699,21 @@ class MLXViewModel: NSObject {
                 shouldContinue = false
             }
             
-            if !shouldContinue { break }
+            if !shouldContinue {
+                // Fix: Ensure partial output is saved to history to maintain User/Assistant alternation
+                // Fallback to self.output if currentOutput is empty (e.g. task cancellation threw before assignment)
+                let partialText = currentOutput.isEmpty ? self.output : currentOutput
+                
+                if !partialText.isEmpty {
+                     await MainActor.run {
+                         // Double check we haven't already appended it to avoid duplicates
+                         if self.messages.last?["role"] as? String != "assistant" {
+                             self.messages.append(["role": "assistant", "content": partialText])
+                         }
+                     }
+                }
+                break 
+            }
 
             // Logic Check (Search vs Final)
              let trimmedOutput = currentOutput.trimmingCharacters(in: .whitespacesAndNewlines)

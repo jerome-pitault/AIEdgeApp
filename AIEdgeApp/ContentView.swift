@@ -65,6 +65,7 @@ struct ContentView: View {
     @State private var showingPhotoPicker: Bool = false
     @State private var photoSelection: PhotosPickerItem?
     @State private var showingSettings = false
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -116,12 +117,23 @@ struct ContentView: View {
                         Image(systemName: "photo.badge.plus")
                     }
                     
-                    // Search toggle button
-                    Button {
-                        vm.isSearchEnabled.toggle()
-                    } label: {
-                        Image(systemName: vm.isSearchEnabled ? "globe" : "globe.slash") // Using globe to represent web search
-                            .foregroundColor(vm.isSearchEnabled ? .green : .gray)
+                    if vm.isRunning {
+                        Button {
+                            vm.stop()
+                        } label: {
+                            Image(systemName: "stop.circle.fill")
+                                .resizable()
+                                .frame(width: 30, height: 30) // Match roughly the touch target of others
+                                .foregroundStyle(.red)
+                        }
+                    } else {
+                        // Search toggle button
+                        Button {
+                            vm.isSearchEnabled.toggle()
+                        } label: {
+                            Image(systemName: vm.isSearchEnabled ? "globe" : "globe.slash") // Using globe to represent web search
+                                .foregroundColor(vm.isSearchEnabled ? .green : .gray)
+                        }
                     }
                     
                     // Stop speech button (only show when speaking)
@@ -164,6 +176,7 @@ struct ContentView: View {
 
                     TextField("Prompt", text: $prompt)
                         .textFieldStyle(.roundedBorder)
+                        .focused($isFocused)
 
                     Button(action: generate) {
                         Image(systemName: "paperplane.fill")
@@ -221,11 +234,18 @@ struct ContentView: View {
     @State private var generationTask: Task<Void, Never>?
 
     private func generate() {
+        // Dismiss keyboard
+        isFocused = false
+        
+        // Capture current prompt and clear it immediately
+        let currentPrompt = prompt
+        prompt = ""
+        
         // Cancel any existing task
         generationTask?.cancel()
         
         generationTask = Task {
-            await vm.generate(prompt: prompt, images: selectedImages)
+            await vm.generate(prompt: currentPrompt, images: selectedImages)
         }
     }
 
