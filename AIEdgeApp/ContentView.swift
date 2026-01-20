@@ -12,6 +12,13 @@ import MLXLMCommon
 import PhotosUI
 import AVFoundation
 
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
 struct ContentView: View {
     /// All models you want to expose in the dropdown
     private let availableModels: [ModelConfiguration] = [
@@ -20,10 +27,13 @@ struct ContentView: View {
         MLXVLM.VLMRegistry.qwen2_VL_2B_Instruct_4bit,
         //LLMRegistry.qwen2_VL_2B_Instruct_4bit,
         LLMRegistry.qwen3_4B_4bit,
+        LLMRegistry.Qwen3_8B_MLX_4bit,
         LLMRegistry.granite_4_0_h_micro_4bit,
         //LLMRegistry.Apertus_8B_2509_4bit,
         LLMRegistry.ministral3_3B_4bit,
-        //LLMRegistry.Voxtral_Mini_3B_2507_bf16
+        LLMRegistry.gemma_3n_E4B_it_lm_4bit,
+        //LLMRegistry.Voxtral_Mini_3B_2507_bf16,
+        MLXVLM.VLMRegistry.Qwen3_VL_4B_Instruct_3bit
     ]
     
     /// Precomputed model options for the picker
@@ -116,6 +126,41 @@ struct ContentView: View {
                     
                     // Stop speech button (only show when speaking)
 
+                    // Selected Image Preview
+                    if let firstImage = selectedImages.first {
+                        ZStack(alignment: .topTrailing) {
+                            #if os(iOS)
+                            if let uiImage = UIImage(data: firstImage) {
+                                Image(uiImage: uiImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            #elseif os(macOS)
+                            if let nsImage = NSImage(data: firstImage) {
+                                Image(nsImage: nsImage)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 40, height: 40)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                            #endif
+                            
+                            // Delete button
+                            Button {
+                                selectedImages = []
+                                photoSelection = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.white, .black.opacity(0.7))
+                                    .font(.system(size: 16))
+                            }
+                            .buttonStyle(.plain)
+                            .offset(x: 5, y: -5)
+                        }
+                        .padding(.trailing, 4)
+                    }
 
                     TextField("Prompt", text: $prompt)
                         .textFieldStyle(.roundedBorder)
@@ -188,8 +233,10 @@ struct ContentView: View {
     private func addImage() {
         Task {
             if let data = try? await photoSelection?.loadTransferable(type: Data.self) {
+                print("DEBUG: UI - Image loaded from picker. Size: \(data.count) bytes")
                 selectedImages = [data]
             } else {
+                print("DEBUG: UI - Failed to load image or cleared")
                 selectedImages = []
             }
         }
@@ -197,6 +244,7 @@ struct ContentView: View {
 #elseif(os(macOS))
     private func addImage(_ result: Result<URL, any Error>) {
         if let url = try? result.get(), let data = try? Data(contentsOf: url) {
+            print("DEBUG: UI - Image loaded from file. Size: \(data.count) bytes")
             selectedImages = [data]
         } else {
             selectedImages = []
@@ -239,11 +287,35 @@ struct ChatBubbleView: View {
                         .background(Color.secondary.opacity(0.1))
                         .clipShape(Capsule())
                 } else {
-                    Text(bubble.content)
-                        .padding(12)
-                        .background(bubble.role == .user ? Color.blue : Color.gray.opacity(0.2))
-                        .foregroundColor(bubble.role == .user ? .white : .primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(bubble.content)
+                        
+                        if let images = bubble.images, !images.isEmpty {
+                            ForEach(Array(images.enumerated()), id: \.offset) { _, imageData in
+                                #if os(iOS)
+                                if let uiImage = UIImage(data: imageData) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxHeight: 200)
+                                        .cornerRadius(8)
+                                }
+                                #elseif os(macOS)
+                                if let nsImage = NSImage(data: imageData) {
+                                    Image(nsImage: nsImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxHeight: 200)
+                                        .cornerRadius(8)
+                                }
+                                #endif
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(bubble.role == .user ? Color.blue : Color.gray.opacity(0.2))
+                    .foregroundColor(bubble.role == .user ? .white : .primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
                 }
             }
             

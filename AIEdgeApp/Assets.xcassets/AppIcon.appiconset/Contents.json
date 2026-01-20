@@ -1,85 +1,109 @@
 {
   "images" : [
     {
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "size" : "20x20",
+      "idiom" : "iphone",
+      "filename" : "settingsicon@x3-5.png",
+      "scale" : "2x"
     },
     {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "dark"
-        }
-      ],
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "size" : "20x20",
+      "idiom" : "iphone",
+      "filename" : "settingsicon@x3-4.png",
+      "scale" : "3x"
     },
     {
-      "appearances" : [
-        {
-          "appearance" : "luminosity",
-          "value" : "tinted"
-        }
-      ],
-      "idiom" : "universal",
-      "platform" : "ios",
-      "size" : "1024x1024"
+      "size" : "29x29",
+      "idiom" : "iphone",
+      "filename" : "appicon58.png",
+      "scale" : "2x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "16x16"
+      "size" : "29x29",
+      "idiom" : "iphone",
+      "filename" : "appicon_settings87.png",
+      "scale" : "3x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "16x16"
+      "size" : "40x40",
+      "idiom" : "iphone",
+      "filename" : "appicon_spotlight80.png",
+      "scale" : "2x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "32x32"
+      "size" : "40x40",
+      "idiom" : "iphone",
+      "filename" : "appicon120.png",
+      "scale" : "3x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "32x32"
+      "size" : "60x60",
+      "idiom" : "iphone",
+      "filename" : "appicon@x2.png",
+      "scale" : "2x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "128x128"
+      "size" : "60x60",
+      "idiom" : "iphone",
+      "filename" : "appicon@x3.png",
+      "scale" : "3x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "128x128"
+      "idiom" : "ipad",
+      "size" : "20x20",
+      "scale" : "1x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "256x256"
+      "idiom" : "ipad",
+      "size" : "20x20",
+      "scale" : "2x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "256x256"
+      "size" : "29x29",
+      "idiom" : "ipad",
+      "filename" : "appicon58-2.png",
+      "scale" : "1x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "1x",
-      "size" : "512x512"
+      "size" : "29x29",
+      "idiom" : "ipad",
+      "filename" : "appicon58-1.png",
+      "scale" : "2x"
     },
     {
-      "idiom" : "mac",
-      "scale" : "2x",
-      "size" : "512x512"
+      "idiom" : "ipad",
+      "size" : "40x40",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "ipad",
+      "size" : "40x40",
+      "scale" : "2x"
+    },
+    {
+      "idiom" : "ipad",
+      "size" : "76x76",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "ipad",
+      "size" : "76x76",
+      "scale" : "2x"
+    },
+    {
+      "idiom" : "ipad",
+      "size" : "83.5x83.5",
+      "scale" : "2x"
+    },
+    {
+      "size" : "1024x1024",
+      "idiom" : "ios-marketing",
+      "filename" : "SSHTunnel_lake_iOS1024.png",
+      "scale" : "1x"
     }
   ],
   "info" : {
-    "author" : "xcode",
-    "version" : 1
+    "version" : 1,
+    "author" : "xcode"
   }
 }

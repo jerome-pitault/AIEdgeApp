@@ -39,12 +39,17 @@ extension AbstractModelRegistry {
         defaultPrompt: "List five interesting facts about black holes"
     )
     
+    static let Qwen3_8B_MLX_4bit = ModelConfiguration(
+        id: "lmstudio-community/Qwen3-8B-MLX-4bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
     static let Apertus_8B_2509_4bit = ModelConfiguration(
         id: "mlx-community/Apertus-8B-2509-4bit",
         overrideTokenizer: "PreTrainedTokenizer",
         defaultPrompt: "List five interesting facts about black holes"
     )
-    
     
     static let ministral3_3B_4bit = ModelConfiguration(
         id: "mlx-community/Ministral-3-3B-Reasoning-2512-4bit",
@@ -58,15 +63,29 @@ extension AbstractModelRegistry {
         defaultPrompt: "List five interesting facts about black holes"
     )
     
+    static let Qwen3_VL_4B_Instruct_3bit  = ModelConfiguration(
+        id: "mlx-community/Qwen3-VL-4B-Instruct-3bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
+    static let gemma_3n_E4B_it_lm_4bit  = ModelConfiguration(
+        id: "mlx-community/gemma-3n-E4B-it-lm-4bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
     func registerCustomModels() {
         register(configurations: [
             Self.deepSeekR1_1_5B_4bit,
             Self.qwen2_5Coder_1_5B_4bit,
             Self.granite_4_0_h_micro_4bit,
             Self.qwen3_4B_4bit,
-            //Self.Apertus_8B_2509_4bit, 
+            Self.Qwen3_8B_MLX_4bit,
+            //Self.Apertus_8B_2509_4bit,
             //Self.qwen2_VL_2B_Instruct_4bit,
             Self.ministral3_3B_4bit,
+            Self.gemma_3n_E4B_it_lm_4bit
             //Self.Voxtral_Mini_3B_2507_bf16
         ])
     }

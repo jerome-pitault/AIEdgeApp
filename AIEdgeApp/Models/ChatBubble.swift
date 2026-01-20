@@ -20,10 +20,12 @@ class ChatBubble: Identifiable, Equatable {
     let role: ChatRole
     var content: String
     var isStreaming: Bool
+    var images: [Data]?
     
-    init(role: ChatRole, content: String, isStreaming: Bool = false) {
+    init(role: ChatRole, content: String, images: [Data]? = nil, isStreaming: Bool = false) {
         self.role = role
         self.content = content
+        self.images = images
         self.isStreaming = isStreaming
     }
     

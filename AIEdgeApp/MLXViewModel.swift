@@ -279,20 +279,44 @@ class MLXViewModel: NSObject {
                 modelDirName = modelIdString
             } */
             
-            let repoId = modelConfiguration.name.replacingOccurrences(of: "/", with: "--")
-            let modelDirName = "models--\(repoId)"
+            // 1. Check Nested Path: huggingface/models/models/owner/repo
+            // This matches the structure seen in the user's logs
+            let nestedPath: URL
+            if modelConfiguration.name.contains("/") {
+                 nestedPath = downloadBaseURL.appending(path: "models").appending(path: modelConfiguration.name)
+            } else {
+                 nestedPath = downloadBaseURL.appending(path: "models").appending(path: "mlx-community").appending(path: modelConfiguration.name)
+            }
             
-            // let expectedModelPath = downloadBaseURL.appending(path: "mlx-community").appending(path: modelDirName)
-            let expectedModelPath = downloadBaseURL.appending(path: modelDirName)
+            // 2. Check Simplified Path: huggingface/models/owner/repo
+            // (Used by some download logic/older versions)
+            let simplifiedPath: URL
+            if modelConfiguration.name.contains("/") {
+                simplifiedPath = downloadBaseURL.appending(path: modelConfiguration.name)
+            } else {
+                 simplifiedPath = downloadBaseURL.appending(path: "mlx-community").appending(path: modelConfiguration.name)
+            }
+
+            // Determine which path to use - Prioritize the nested path found in logs
+            let expectedModelPath: URL
+            if FileManager.default.fileExists(atPath: nestedPath.path()) {
+                expectedModelPath = nestedPath
+                print("Found model at nested path: \(nestedPath.path())")
+            } else if FileManager.default.fileExists(atPath: simplifiedPath.path()) {
+                expectedModelPath = simplifiedPath
+                 print("Found model at simplified path: \(simplifiedPath.path())")
+            } else {
+                // Default to nested path if neither exists (so download might go there, or we validly fail)
+                expectedModelPath = nestedPath
+                print("Model not found at any expected path.")
+                print("Checked nested: \(nestedPath.path())")
+                print("Checked simplified: \(simplifiedPath.path())")
+            }
             
-            // Check existence
             let exists = FileManager.default.fileExists(atPath: expectedModelPath.path())
-            print("Expected model path: \(expectedModelPath.path())")
+            print("Final resolved model path: \(expectedModelPath.path())")
             print("Model directory exists: \(exists)")
-            
-            print("Expected model path: \(expectedModelPath.path())")
-            print("Model directory exists: \(FileManager.default.fileExists(atPath: expectedModelPath.path()))")
-            
+            /*
             // Check for cache directories that might have old data
             let cachePath = expectedModelPath.appending(path: ".cache")
             if FileManager.default.fileExists(atPath: cachePath.path()) {
@@ -320,13 +344,13 @@ class MLXViewModel: NSObject {
                     }
                 }
             }
-            
+            */
             // Try loading - the download should start if files don't exist
             print("Attempting to load model (download will start if needed)...")
             
             var downloadStarted = false
             modelContainer = try await modelFactory.loadContainer(
-                hub: hub, 
+                hub: hub,
                 configuration: modelConfiguration
             ) { progress in
                 downloadStarted = true
@@ -340,7 +364,6 @@ class MLXViewModel: NSObject {
             if !downloadStarted && !FileManager.default.fileExists(atPath: expectedModelPath.path()) {
                 print("WARNING: Download callback was not called, but model directory doesn't exist. This might indicate a download issue.")
             }
-            
             logMemoryUsage("Model loaded successfully")
         } catch {
             // More detailed error information
@@ -416,21 +439,35 @@ class MLXViewModel: NSObject {
         }
 
         // 2. Add User Message
-        let images: [UserInput.Image] = images.compactMap { CIImage(data: $0) }.map { .ciImage($0) }
+        let modelInputImages: [UserInput.Image] = images.compactMap { CIImage(data: $0) }.map { .ciImage($0) }
         
         let userMessage: Message
-        if images.isEmpty {
+        if modelInputImages.isEmpty {
             userMessage = [
                 "role": "user",
                 "content": prompt
             ]
         } else {
+            // Key Fix: Store the actual UserInput.Image object in the dictionary so we can retrieve it later
+            // The tokenizer only looks for "type": "image", so adding "_image" is safe
             userMessage = [
                 "role": "user",
                 "content": [
                     ["type": "text", "text": prompt]
-                ] + images.map { _ in ["type": "image"] }
+                ] + modelInputImages.map { ["type": "image", "_image": $0] }
             ]
+        }
+        
+        // VLM Memory Optimization: If sending a new image, clear previous history
+        // to prevent OOM. We only keep the system prompt.
+        if !modelInputImages.isEmpty {
+            let systemPrompt = self.messages.first { $0["role"] as? String == "system" }
+            self.messages.removeAll()
+            print("DEBUG: New image detected. Cleared conversation history to free memory.")
+            
+            if let sys = systemPrompt {
+                self.messages.append(sys)
+            }
         }
         
         // Memory Optimization: Prune history if it gets too long
@@ -454,10 +491,10 @@ class MLXViewModel: NSObject {
         self.messages.append(userMessage)
         
         // Add User Bubble to UI
-        self.chatHistory.append(ChatBubble(role: .user, content: prompt))
+        self.chatHistory.append(ChatBubble(role: .user, content: prompt, images: images.isEmpty ? nil : images))
         
         // 3. Start Recursive Generation Loop
-        await generateResponse(images: images)
+        await generateResponse(images: modelInputImages)
     }
 
     /// Internal function to handle the generate -> tool -> generate loop iteratively
@@ -501,11 +538,46 @@ class MLXViewModel: NSObject {
                 currentOutput = try await Task.detached(priority: .userInitiated) {
                     var finalOutput = ""
                     try await container.perform { context in
-                        // Create user input
-                        var userInput = UserInput(messages: messagesSnapshot)
+                        // FIX: Cumulative Image Collection
+                        // We must find ALL images in the history to match the placeholder tokens
+                        var cumulativeImages: [UserInput.Image] = []
+                        
+                        for msg in messagesSnapshot {
+                            if let content = msg["content"] as? [[String: Any]] {
+                                for part in content {
+                                    if let type = part["type"] as? String, type == "image",
+                                       let imgObj = part["_image"] as? UserInput.Image {
+                                        cumulativeImages.append(imgObj)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // FIX: Sanitize messages for Jinja (remove _image key which causes runtime errors)
+                        let sanitizedMessages = messagesSnapshot.map { msg -> Message in
+                            var newMsg = msg
+                            if let content = msg["content"] as? [[String: Any]] {
+                                newMsg["content"] = content.map { part in
+                                    var newPart = part
+                                    newPart.removeValue(forKey: "_image")
+                                    return newPart
+                                }
+                            }
+                            return newMsg
+                        }
+                        
+                        // Create user input with SANITIZED messages
+                        var userInput = UserInput(messages: sanitizedMessages)
                         userInput.processing.resize = CGSize(width: 448, height: 448)
-                        if !inputImages.isEmpty {
+                        
+                        // If we found historical images, use them.
+                        // Otherwise fallback to inputImages (current turn only) - keeping original behavior for edge cases
+                        if !cumulativeImages.isEmpty {
+                            userInput.images = cumulativeImages
+                            print("DEBUG: Providing \(cumulativeImages.count) cumulative images to model")
+                        } else if !inputImages.isEmpty {
                             userInput.images = inputImages
+                             print("DEBUG: Providing \(inputImages.count) current-turn images to model")
                         }
                         
                         // Create LM input
@@ -571,7 +643,7 @@ class MLXViewModel: NSObject {
                 }
                 
                 // Perform the search
-                // Strict memory limit: 3 results, max 600 chars total
+                // Strict memory limit: 5 results, max 600 chars total
                 let searchResultsText: String
                 
                 // Add System Bubble for searching
@@ -592,13 +664,13 @@ class MLXViewModel: NSObject {
                         }
                     } else {
                         // VERY Aggressive truncation
-                        // Only top 3 results
-                        let topResults = results.prefix(3)
+                        // Only top 5 results
+                        let topResults = results.prefix(5)
                         var combined = "Search Results:\n" + topResults.map { "- [\($0.title)](\($0.link)): \($0.snippet)" }.joined(separator: "\n\n")
                         
                         // Initial soft cap
-                        if combined.count > 600 {
-                             combined = String(combined.prefix(600)) + "\n...(truncated)"
+                        if combined.count > 1000 {
+                             combined = String(combined.prefix(1000)) + "\n...(truncated)"
                         }
                         searchResultsText = combined
                         
