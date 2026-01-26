@@ -4,12 +4,15 @@
 //
 
 import SwiftUI
+import MLXLMCommon
 
 struct ModelSettingsView: View {
     let baseViewModel: MLXViewModel
     @State private var models: [(name: String, path: URL, size: Int64)] = []
     @State private var isLoading = false
     @Environment(\.dismiss) var dismiss
+    
+    let availableModels: [ModelConfiguration]
     
     var body: some View {
         NavigationStack {
@@ -56,6 +59,16 @@ struct ModelSettingsView: View {
                             
                             Spacer()
                             
+                            // HuggingFace Link
+                            if let url = getHuggingFaceURL(for: model.name) {
+                                Link(destination: url) {
+                                    Image(systemName: "globe")
+                                        .foregroundColor(.blue)
+                                        .padding(.horizontal, 8)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            
                             Button {
                                 if baseViewModel.deleteModelDirectory(at: model.path) {
                                     loadModels()
@@ -90,6 +103,18 @@ struct ModelSettingsView: View {
                 loadModels()
             }
         }
+    }
+    
+    private func getHuggingFaceURL(for modelName: String) -> URL? {
+        // 1. Check if we can find a matching model configuration
+        // We look for a config ID that ends with the model directory name
+        if let config = availableModels.first(where: { String(describing: $0.id).hasSuffix(modelName) }) {
+            return URL(string: "https://huggingface.co/\(config.id)")
+        }
+        
+        // 2. Fallback: Assumption that it is an mlx-community model if we can't find it
+        // This is a reasonable default for this app's ecosystem
+        return URL(string: "https://huggingface.co/mlx-community/\(modelName)")
     }
     
     private func loadModels() {
