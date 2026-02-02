@@ -36,17 +36,9 @@ struct ContentView: View {
         //LLMRegistry.Voxtral_Mini_3B_2507_bf16
     ]
 
-    @State private var showingSettings = false
-    @State private var vmForSettings: MLXViewModel? // Temporary VM just for settings adjustments if needed
-
     init() {
         // Register custom models once
         LLMModelFactory.shared.modelRegistry.registerCustomModels()
-        
-        // We create a dummy VM just to pass to settings if it requires one for binding.
-        // If ModelSettingsView requires a running VM, we might need to adjust it.
-        // Assuming for now we can pass a dummy one or refactor ModelSettingsView later if needed.
-        _vmForSettings = State(initialValue: MLXViewModel(modelConfiguration: LLMRegistry.qwen3_4B_4bit))
     }
 
     var body: some View {
@@ -68,22 +60,6 @@ struct ContentView: View {
                 .padding(.vertical, 8)
             }
             .navigationTitle("Models")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showingSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                    }
-                }
-            }
-            .sheet(isPresented: $showingSettings) {
-                // Pass the dummy VM or modify SettingsView to not need it if possible.
-                // For now, keeping compatibility.
-                if let vm = vmForSettings {
-                    ModelSettingsView(baseViewModel: vm, availableModels: availableModels)
-                }
-            }
         }
     }
 }

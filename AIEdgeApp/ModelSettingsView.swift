@@ -8,8 +8,9 @@ import MLXLMCommon
 
 struct ModelSettingsView: View {
     let baseViewModel: MLXViewModel
-    @State private var models: [(name: String, path: URL, size: Int64)] = []
-    @State private var isLoading = false
+    @State private var modelStatus: (isDownloaded: Bool, size: String)? = nil
+    @State private var showingDeleteConfirmation = false
+    @State private var modelPath: URL?
     @Environment(\.dismiss) var dismiss
     
     let availableModels: [ModelConfiguration]
@@ -18,7 +19,7 @@ struct ModelSettingsView: View {
         NavigationStack {
             List {
                 Section("System Prompt") {
-                    TextEditor(text: Bindable(baseViewModel).searchSystemPrompt)
+                    TextEditor(text: Bindable(baseViewModel).modelSettings.systemPrompt)
                         .frame(minHeight: 100)
                         .font(.caption)
                     
@@ -27,104 +28,138 @@ struct ModelSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                if isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
-                    }
-                    .padding()
-                } else if models.isEmpty {
-                    VStack(spacing: 8) {
-                        Text("No models downloaded")
-                            .foregroundColor(.secondary)
-                        Text("Download models by selecting them from the model picker and generating text")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding()
-                } else {
-                    ForEach(models, id: \.path) { model in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(model.name)
-                                    .font(.headline)
-                                Text(baseViewModel.formatBytes(model.size))
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            // HuggingFace Link
-                            if let url = getHuggingFaceURL(for: model.name) {
-                                Link(destination: url) {
-                                    Image(systemName: "globe")
-                                        .foregroundColor(.blue)
-                                        .padding(.horizontal, 8)
+                Section("Dynamic Context (Read-Only)") {
+                    Text(baseViewModel.datePromptSuffix)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text("This date information is automatically appended to your system prompt.")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                
+                Section("Current Model") {
+                    if let config = availableModels.first {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(getDisplayName(for: config))
+                                        .font(.headline)
+                                    
+                                    if let status = modelStatus {
+                                        if status.isDownloaded {
+                                            Text("Downloaded • \(status.size)")
+                                                .font(.caption)
+                                                .foregroundColor(.green)
+                                        } else {
+                                            Text("Not downloaded")
+                                                .font(.caption)
+                                                .foregroundColor(.orange)
+                                        }
+                                    }
                                 }
-                                .buttonStyle(.plain)
+                                
+                                Spacer()
+                                
+                                // HuggingFace Link
+                                if let url = getHuggingFaceURL(for: config) {
+                                    Link(destination: url) {
+                                        Image(systemName: "globe")
+                                            .foregroundColor(.blue)
+                                            .padding(.horizontal, 8)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                
+                                // Delete button (only visible if downloaded)
+                                if let status = modelStatus, status.isDownloaded {
+                                    Button {
+                                        showingDeleteConfirmation = true
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .foregroundColor(.red)
+                                            .padding(.horizontal, 8)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                             
-                            Button {
-                                if baseViewModel.deleteModelDirectory(at: model.path) {
-                                    loadModels()
-                                }
-                            } label: {
-                                Image(systemName: "trash")
-                                    .foregroundColor(.red)
-                            }
-                            .buttonStyle(.plain)
+                            Text("Tap the globe icon to view model details and documentation on HuggingFace.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                                .padding(.top, 4)
                         }
                         .padding(.vertical, 4)
                     }
                 }
             }
-            .navigationTitle("Model Storage")
+            .navigationTitle("Settings")
+            .alert("Delete Model?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    deleteCurrentModel()
+                }
+            } message: {
+                Text("This will free up space on your device. You can re-download the model later if needed.")
+            }
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        loadModels()
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        Task {
+                             await baseViewModel.saveSettings()
+                             dismiss()
+                        }
                     }
                 }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
+            }
+            .onDisappear {
+                Task {
+                    await baseViewModel.saveSettings()
                 }
             }
             .onAppear {
-                loadModels()
+                checkModelStatus()
             }
         }
     }
     
-    private func getHuggingFaceURL(for modelName: String) -> URL? {
-        // 1. Check if we can find a matching model configuration
-        // We look for a config ID that ends with the model directory name
-        if let config = availableModels.first(where: { String(describing: $0.id).hasSuffix(modelName) }) {
-            return URL(string: "https://huggingface.co/\(config.id)")
+    private func getDisplayName(for config: ModelConfiguration) -> String {
+        if let lastPart = config.name.split(separator: "/").last {
+            return String(lastPart)
         }
-        
-        // 2. Fallback: Assumption that it is an mlx-community model if we can't find it
-        // This is a reasonable default for this app's ecosystem
-        return URL(string: "https://huggingface.co/mlx-community/\(modelName)")
+        return config.name
     }
     
-    private func loadModels() {
-        isLoading = true
-        // Small delay to show loading state
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            models = baseViewModel.getDownloadedModels()
-            isLoading = false
+    private func getHuggingFaceURL(for config: ModelConfiguration) -> URL? {
+        return URL(string: "https://huggingface.co/\(config.id)")
+    }
+    
+    private func checkModelStatus() {
+        guard let config = availableModels.first else { return }
+        
+        let allModels = baseViewModel.getDownloadedModels()
+        let displayName = getDisplayName(for: config)
+        
+        if let found = allModels.first(where: { $0.name == displayName }) {
+            modelStatus = (isDownloaded: true, size: baseViewModel.formatBytes(found.size))
+            modelPath = found.path
+        } else {
+            modelStatus = (isDownloaded: false, size: "")
+            modelPath = nil
         }
     }
+    
+    private func deleteCurrentModel() {
+        guard let path = modelPath else { return }
+        
+        if baseViewModel.deleteModelDirectory(at: path) {
+            // Refresh status after deletion
+            checkModelStatus()
+        }
+    }
+    
+
 }
 
 

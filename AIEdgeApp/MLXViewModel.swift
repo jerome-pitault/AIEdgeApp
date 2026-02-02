@@ -81,12 +81,29 @@ class MLXViewModel: NSObject {
     var isSearching = false
 
     /// The system prompt used to instruct the model for web search
-    var searchSystemPrompt: String = {
+    /// The currently active model settings
+    var modelSettings: ModelSettings = .default
+
+    /// The system prompt used to instruct the model for web search
+    /// Now computed from modelSettings
+    /// The dynamic date suffix appended to the prompt
+    var datePromptSuffix: String {
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .full
         let dateString = dateFormatter.string(from: Date())
-        return "You are a helpful assistant with access to a web search tool. To use it, start your response with 'SEARCH: <query>'. Stop generating after issuing the command. I will parse the results and give them to you. Today is \(dateString)."
-    }()
+        return " Today is \(dateString)."
+    }
+
+    /// The system prompt used to instruct the model for web search
+    /// Now computed from modelSettings
+    var searchSystemPrompt: String {
+        get {
+             return "\(modelSettings.systemPrompt)\(datePromptSuffix)"
+        }
+        set {
+            // setter not strictly needed if binding to modelSettings directly
+        }
+    }
 
     /// The download base directory for models
     private var downloadBaseURL: URL {
@@ -128,8 +145,109 @@ class MLXViewModel: NSObject {
         downloadProgress = nil
         
         // Clear conversation history
+        // Save before clearing - CAPTURE HISTORY FIRST
+        let currentHistory = self.chatHistory
+        let modelName = self.modelConfiguration.name
+        
+        Task {
+            if !currentHistory.isEmpty {
+                 await ConversationPersistence.shared.save(history: currentHistory, for: modelName)
+            }
+        }
+        
         messages.removeAll()
         chatHistory.removeAll()
+    }
+    
+    /// Loads the conversation history for the current model
+    func loadConversation() async {
+        let modelName = modelConfiguration.name
+        print("DEBUG: Loading conversation for \(modelName)")
+        
+        // Load Settings First
+        if let settings = await ConversationPersistence.shared.loadSettings(for: modelName) {
+            await MainActor.run {
+                self.modelSettings = settings
+                print("DEBUG: Loaded settings for \(modelName)")
+            }
+        }
+        
+        if let history = await ConversationPersistence.shared.load(for: modelName) {
+            await MainActor.run {
+                self.chatHistory = history
+                // Rebuild LLM context from history
+                self.rebuildMessagesFromHistory()
+                print("DEBUG: Loaded \(history.count) messages from history")
+            }
+        }
+    }
+    
+    /// Saves the current conversation history and settings
+    func saveConversation() async {
+        let modelName = modelConfiguration.name
+        let history = await MainActor.run { self.chatHistory }
+        let settings = await MainActor.run { self.modelSettings }
+        
+        if !history.isEmpty {
+           // print("DEBUG: Saving conversation for \(modelName)")
+            await ConversationPersistence.shared.save(history: history, for: modelName)
+        }
+        
+        // Save settings too
+        await ConversationPersistence.shared.saveSettings(settings, for: modelName)
+    }
+    
+    /// Explicitly save settings (useful for UI updates)
+    func saveSettings() async {
+        let modelName = modelConfiguration.name
+        let settings = await MainActor.run { self.modelSettings }
+        await ConversationPersistence.shared.saveSettings(settings, for: modelName)
+    }
+    
+    /// Rebuilds the LLM 'messages' array from the UI 'chatHistory'
+    /// Applies the same memory optimization logic (last N messages)
+    private func rebuildMessagesFromHistory() {
+        self.messages.removeAll()
+        
+        // Always add system prompt if search is enabled
+        if isSearchEnabled {
+            self.messages.append([
+                "role": "system",
+                "content": self.searchSystemPrompt
+            ])
+        }
+        
+        // Take last 6 bubbles (3 turns) + any system/search contexts within them?
+        // Actually, simpler: Just mapping the last few valid text bubbles is usually enough.
+        // But we need to be careful about matching the format.
+        
+        let historyToInclude = self.chatHistory.suffix(10) // Take last 10 items to be safe
+        
+        for bubble in historyToInclude {
+            var roleString = "user"
+            switch bubble.role {
+            case .user: roleString = "user"
+            case .assistant: roleString = "assistant"
+            case .system: continue // Skip system bubbles (search status) for the LLM context usually, unless it's a tool output
+            }
+            
+            // Handle images if present in user message
+            if bubble.role == .user, let images = bubble.images, !images.isEmpty {
+                 let modelInputImages: [UserInput.Image] = images.compactMap { CIImage(data: $0) }.map { .ciImage($0) }
+                 let content: [String: Any] = [
+                    "role": roleString,
+                    "content": [
+                        ["type": "text", "text": bubble.content]
+                    ] + modelInputImages.map { ["type": "image", "_image": $0] }
+                 ]
+                 self.messages.append(content)
+            } else {
+                self.messages.append([
+                    "role": roleString,
+                    "content": bubble.content
+                ])
+            }
+        }
     }
 
     init(modelConfiguration: ModelConfiguration) {
@@ -181,6 +299,8 @@ class MLXViewModel: NSObject {
         
         // Setup lifecycle and memory monitoring
         setupLifecycleObservers()
+        
+        // Removed eager loading in init, now handled by ChatView.task
     }
     
     private func setupLifecycleObservers() {
@@ -302,7 +422,12 @@ class MLXViewModel: NSObject {
         }
         
         let used = result == KERN_SUCCESS ? Double(taskInfo.phys_footprint) : 0
+        
+        #if os(iOS)
         let available = Double(os_proc_available_memory())
+        #elseif os(macOS)
+        let available = Double(ProcessInfo.processInfo.physicalMemory)
+        #endif
         
         let usedStr = ByteCountFormatter.string(fromByteCount: Int64(used), countStyle: .memory)
         let availableStr = ByteCountFormatter.string(fromByteCount: Int64(available), countStyle: .memory)
@@ -550,6 +675,9 @@ class MLXViewModel: NSObject {
         // Add User Bubble to UI
         self.chatHistory.append(ChatBubble(role: .user, content: prompt, images: images.isEmpty ? nil : images))
         
+        // Auto-save after user message
+        await saveConversation()
+        
         // 3. Start Recursive Generation Loop
         await generateResponse(images: modelInputImages)
     }
@@ -711,6 +839,8 @@ class MLXViewModel: NSObject {
                              self.messages.append(["role": "assistant", "content": partialText])
                          }
                      }
+                     // Auto-save partial result
+                     await self.saveConversation()
                 }
                 break 
             }
@@ -788,6 +918,9 @@ class MLXViewModel: NSObject {
                         "content": "Here are the search results:\n\(searchResultsText)\n\nPlease answer using these results."
                     ])
                 }
+
+                // Auto-save search results
+                await self.saveConversation()
                 
                 // Continue loop
                 depth += 1
@@ -813,23 +946,10 @@ class MLXViewModel: NSObject {
                     "role": "assistant",
                     "content": currentOutput
                 ])
-                
-                     
-                if self.chatHistory.last?.role == .assistant {
-                     // It's already there, just ensure isStreaming is false
-                     var lastBubble = self.chatHistory[self.chatHistory.count - 1]
-                     lastBubble.isStreaming = false
-                     self.chatHistory[self.chatHistory.count - 1] = lastBubble
-                 } else {
-                     // Should not happen usually if streaming, but safe fallback
-                     self.chatHistory.append(ChatBubble(role: .assistant, content: currentOutput, isStreaming: false))
-                 }
-                 
-                self.messages.append([
-                    "role": "assistant",
-                    "content": currentOutput
-                ])
             }
+            
+            // Auto-save after final answer
+            await self.saveConversation()
             
             shouldContinue = false
         }

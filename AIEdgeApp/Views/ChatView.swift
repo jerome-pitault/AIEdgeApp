@@ -20,6 +20,7 @@ struct ChatView: View {
     
     @State private var showingPhotoPicker: Bool = false
     @State private var photoSelection: PhotosPickerItem?
+    @State private var showingSettings: Bool = false
     
     @FocusState private var isFocused: Bool
     
@@ -132,11 +133,21 @@ struct ChatView: View {
             }
             .padding()
         }
-        .navigationTitle(displayName)
+        .navigationTitle("")
         #if(os(iOS))
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 2) {
+                    Text(displayName)
+                        .font(.headline)
+                    Text("\(vm.tokensPerSecond, format: .number.precision(.fractionLength(2))) t/s • \(vm.memoryStats)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            
             if let errorMessage = vm.errorMessage {
                 ToolbarItem {
                     AppErrorView(errorMessage: errorMessage)
@@ -148,14 +159,26 @@ struct ChatView: View {
                     DownloadProgressView(progress: progress)
                 }
             }
-
+            
             ToolbarItem(placement: .primaryAction) {
-                 TokensPerSecondView(value: vm.tokensPerSecond, memoryStats: vm.memoryStats)
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                }
             }
+        }
+        .sheet(isPresented: $showingSettings) {
+             ModelSettingsView(baseViewModel: vm, availableModels: [vm.modelConfiguration])
         }
         .onDisappear {
             // Unload model when leaving the chat view
             vm.unloadModel()
+        }
+        .task {
+            // Reload conversation when entering the view
+            // This fixes the issue where messages disappear after going back
+            await vm.loadConversation()
         }
         #if(os(iOS))
         .photosPicker(isPresented: $showingPhotoPicker, selection: $photoSelection)
