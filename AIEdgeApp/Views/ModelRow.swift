@@ -11,6 +11,8 @@ import MLXLMCommon
 import MLXEmbedders
 
 
+import MLXVLM
+
 struct ModelRow: View {
     let model: MLXLMCommon.ModelConfiguration
     let isSelected: Bool
@@ -25,18 +27,32 @@ struct ModelRow: View {
         return model.name
     }
     
+    var isVLM: Bool {
+        // Check VLM registry
+        let isRegisteredVLM = VLMModelFactory.shared.modelRegistry.models.contains { $0.name == model.name }
+        // Check simple heuristic for custom models
+        let isNameVLM = model.name.lowercased().contains("vl") || model.name.lowercased().contains("vision")
+        return isRegisteredVLM || isNameVLM
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             // Avatar / Icon
             ZStack {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(isVLM ? Color.purple : Color.blue)
                     .frame(width: 50, height: 50)
                 
-                Text(String(displayName.prefix(1)).uppercased())
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.white)
+                if isVLM {
+                    Image(systemName: "camera.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                } else {
+                    Text(String(displayName.prefix(1)).uppercased())
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
             }
             
             VStack(alignment: .leading, spacing: 4) {

@@ -10,6 +10,7 @@ struct ModelSettingsView: View {
     let baseViewModel: MLXViewModel
     @State private var modelStatus: (isDownloaded: Bool, size: String)? = nil
     @State private var showingDeleteConfirmation = false
+    @State private var showingClearConversationConfirmation = false
     @State private var modelPath: URL?
     @Environment(\.dismiss) var dismiss
     
@@ -92,6 +93,21 @@ struct ModelSettingsView: View {
                         .padding(.vertical, 4)
                     }
                 }
+                
+                Section("Conversation Management") {
+                    Button(role: .destructive) {
+                        showingClearConversationConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash.circle")
+                            Text("Clear Conversation History")
+                        }
+                    }
+                    
+                    Text("This will delete all messages in the current conversation. This action cannot be undone.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .navigationTitle("Settings")
             .alert("Delete Model?", isPresented: $showingDeleteConfirmation) {
@@ -101,6 +117,14 @@ struct ModelSettingsView: View {
                 }
             } message: {
                 Text("This will free up space on your device. You can re-download the model later if needed.")
+            }
+            .alert("Clear Conversation?", isPresented: $showingClearConversationConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear", role: .destructive) {
+                    clearConversation()
+                }
+            } message: {
+                Text("This will permanently delete all messages in this conversation. This action cannot be undone.")
             }
             .toolbar {
                 
@@ -156,6 +180,13 @@ struct ModelSettingsView: View {
         if baseViewModel.deleteModelDirectory(at: path) {
             // Refresh status after deletion
             checkModelStatus()
+        }
+    }
+    
+    private func clearConversation() {
+        Task {
+            await baseViewModel.clearConversation()
+            dismiss()
         }
     }
     

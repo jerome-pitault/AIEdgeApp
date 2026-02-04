@@ -95,6 +95,22 @@ actor ConversationPersistence {
         }
     }
     
+    func delete(for modelName: String) {
+        let fileURL = getFileURL(for: modelName)
+        
+        guard fileManager.fileExists(atPath: fileURL.path()) else {
+            return
+        }
+        
+        do {
+            try fileManager.removeItem(at: fileURL)
+            print("Deleted conversation for \(modelName)")
+        } catch {
+            print("Failed to delete conversation for \(modelName): \(error)")
+        }
+    }
+    
+    
     // MARK: - Settings Persistence
     
     private func getSettingsFileURL(for modelName: String) -> URL {

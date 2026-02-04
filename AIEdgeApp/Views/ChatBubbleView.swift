@@ -27,6 +27,7 @@ struct ChatBubbleView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(bubble.content)
+                            .textSelection(.enabled)
                         
                         if let images = bubble.images, !images.isEmpty {
                             ForEach(Array(images.enumerated()), id: \.offset) { _, imageData in

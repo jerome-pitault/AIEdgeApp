@@ -57,13 +57,21 @@ struct ChatView: View {
                          }
                      }
                 }
+                .onChange(of: vm.chatHistory.last?.content) { _, _ in
+                     // Auto-scroll during text streaming
+                     if let lastId = vm.chatHistory.last?.id {
+                         proxy.scrollTo(lastId, anchor: .bottom)
+                     }
+                }
             }
             
             HStack {
-                Button {
-                    showingPhotoPicker = true
-                } label: {
-                    Image(systemName: "photo.badge.plus")
+                if vm.isVLM {
+                    Button {
+                        showingPhotoPicker = true
+                    } label: {
+                        Image(systemName: "photo.badge.plus")
+                    }
                 }
                 
                 if vm.isRunning {
@@ -75,7 +83,7 @@ struct ChatView: View {
                             .frame(width: 30, height: 30)
                             .foregroundStyle(.red)
                     }
-                } else {
+                } /*else {
                     // Search toggle button
                     Button {
                         vm.isSearchEnabled.toggle()
@@ -83,7 +91,7 @@ struct ChatView: View {
                         Image(systemName: vm.isSearchEnabled ? "globe" : "globe.slash")
                             .foregroundColor(vm.isSearchEnabled ? .green : .gray)
                     }
-                }
+                }*/
                 
                 // Selected Image Preview
                 if let firstImage = selectedImages.first {

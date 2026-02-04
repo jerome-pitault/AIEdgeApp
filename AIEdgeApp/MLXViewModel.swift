@@ -37,6 +37,15 @@ class MLXViewModel: NSObject {
     ///
     /// There is two type ``ModelFactory``: ``LLMModelFactory`` and ``VLMModelFactory``.
     var modelContainer: ModelContainer?
+    
+    /// Returns true if the current model is a Vision Language Model
+    var isVLM: Bool {
+        // Check VLM registry
+        let isRegisteredVLM = VLMModelFactory.shared.modelRegistry.models.contains { $0.name == modelConfiguration.name }
+        // Check simple heuristic for custom models
+        let isNameVLM = modelConfiguration.name.lowercased().contains("vl") || modelConfiguration.name.lowercased().contains("vision")
+        return isRegisteredVLM || isNameVLM
+    }
 
     /// The output of the language model.
     ///
@@ -202,6 +211,20 @@ class MLXViewModel: NSObject {
         let modelName = modelConfiguration.name
         let settings = await MainActor.run { self.modelSettings }
         await ConversationPersistence.shared.saveSettings(settings, for: modelName)
+    }
+    
+    /// Clear conversation history for this model
+    func clearConversation() async {
+        let modelName = modelConfiguration.name
+        
+        // Clear in-memory conversation
+        await MainActor.run {
+            self.chatHistory.removeAll()
+            self.messages.removeAll()
+        }
+        
+        // Delete persisted conversation on disk
+        await ConversationPersistence.shared.delete(for: modelName)
     }
     
     /// Rebuilds the LLM 'messages' array from the UI 'chatHistory'
@@ -758,6 +781,13 @@ class MLXViewModel: NSObject {
                             return newMsg
                         }
                         
+                        // DEBUG: Print messages being sent to model
+                        print("DEBUG: ===== MESSAGES SENT TO MODEL =====")
+                        for (idx, msg) in sanitizedMessages.enumerated() {
+                            print("DEBUG: Message \(idx): \(msg)")
+                        }
+                        print("DEBUG: =====================================")
+                        
                         // Create user input with SANITIZED messages
                         var userInput = UserInput(messages: sanitizedMessages)
                         userInput.processing.resize = CGSize(width: 448, height: 448)
@@ -780,8 +810,18 @@ class MLXViewModel: NSObject {
                             // Critical: Stop if the task is cancelled
                             if Task.isCancelled { return .stop }
                             
+                            // DEBUG: Print tokens
+                            print("DEBUG: NEW TOKENS: \(tokens)")
+                            
                             let text = context.tokenizer.decode(tokens: tokens)
                             finalOutput = text
+                            
+                            // DEBUG: Print the raw text to console
+                            if tokens.count < 20 {  // Only print for first few iterations
+                                print("DEBUG TEXT OUTPUT (first 200 chars): \(String(text.prefix(200)))")
+                                print("DEBUG TEXT BYTE COUNT: \(text.utf8.count)")
+                                print("DEBUG TEXT CHARACTER COUNT: \(text.count)")
+                            }
                             
                             Task { @MainActor in
                                 self.output = text
