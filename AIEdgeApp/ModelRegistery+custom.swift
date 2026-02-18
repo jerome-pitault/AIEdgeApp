@@ -45,6 +45,12 @@ extension AbstractModelRegistry {
         defaultPrompt: "List five interesting facts about black holes"
     )
     
+    static let Qwen3_14B_MLX_4bit = ModelConfiguration(
+        id: "lmstudio-community/Qwen3-14B-MLX-4bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
     static let Apertus_8B_2509_4bit = ModelConfiguration(
         id: "mlx-community/Apertus-8B-2509-4bit",
         overrideTokenizer: "PreTrainedTokenizer",
@@ -82,7 +88,8 @@ extension AbstractModelRegistry {
             Self.granite_4_0_h_micro_4bit,
             Self.qwen3_4B_4bit,
             Self.Qwen3_8B_MLX_4bit,
-            //Self.Apertus_8B_2509_4bit,
+            Self.Qwen3_14B_MLX_4bit,
+            // Self.Apertus_8B_2509_4bit,
             //Self.qwen2_VL_2B_Instruct_4bit,
             Self.ministral3_3B_4bit,
             Self.gemma_3n_E4B_it_lm_4bit

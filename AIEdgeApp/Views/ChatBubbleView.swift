@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ChatBubbleView: View {
     let bubble: ChatBubble
+    var onSpeak: (() -> Void)? = nil
     
     var body: some View {
         HStack {
@@ -58,7 +59,17 @@ struct ChatBubbleView: View {
                 }
             }
             
+            
+
             if bubble.role != .user {
+                if let onSpeak = onSpeak {
+                    Button(action: onSpeak) {
+                        Image(systemName: "speaker.wave.2.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 4)
+                }
                 Spacer()
             }
         }

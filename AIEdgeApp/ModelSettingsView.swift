@@ -18,8 +18,8 @@ struct ModelSettingsView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                Section("System Prompt") {
+            Form {
+                Section(header: Text("System Prompt")) {
                     TextEditor(text: Bindable(baseViewModel).modelSettings.systemPrompt)
                         .frame(minHeight: 100)
                         .font(.caption)
@@ -29,7 +29,7 @@ struct ModelSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 
-                Section("Dynamic Context (Read-Only)") {
+                Section(header: Text("Dynamic Context (Read-Only)")) {
                     Text(baseViewModel.datePromptSuffix)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -39,7 +39,7 @@ struct ModelSettingsView: View {
                         .foregroundStyle(.tertiary)
                 }
                 
-                Section("Current Model") {
+                Section(header: Text("Current Model")) {
                     if let config = availableModels.first {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -94,7 +94,7 @@ struct ModelSettingsView: View {
                     }
                 }
                 
-                Section("Conversation Management") {
+                Section(header: Text("Conversation Management")) {
                     Button(role: .destructive) {
                         showingClearConversationConfirmation = true
                     } label: {
@@ -156,7 +156,7 @@ struct ModelSettingsView: View {
     }
     
     private func getHuggingFaceURL(for config: ModelConfiguration) -> URL? {
-        return URL(string: "https://huggingface.co/\(config.id)")
+        return URL(string: "https://huggingface.co/\(config.name)")
     }
     
     private func checkModelStatus() {
@@ -192,5 +192,4 @@ struct ModelSettingsView: View {
     
 
 }
-
 

@@ -29,6 +29,7 @@ struct ContentView: View {
         //LLMRegistry.qwen2_VL_2B_Instruct_4bit,
         LLMRegistry.qwen3_4B_4bit,
         LLMRegistry.Qwen3_8B_MLX_4bit,
+        LLMRegistry.Qwen3_14B_MLX_4bit,
         LLMRegistry.granite_4_0_h_micro_4bit,
         //LLMRegistry.Apertus_8B_2509_4bit,
         LLMRegistry.ministral3_3B_4bit,

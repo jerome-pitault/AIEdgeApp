@@ -7,10 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		026133ED2F33E66300DB394B /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 026133EC2F33E66300DB394B /* MLXEmbedders */; };
-		026133EF2F33E66800DB394B /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 026133EE2F33E66800DB394B /* MLXLLM */; };
-		026133F12F33E66C00DB394B /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 026133F02F33E66C00DB394B /* MLXLMCommon */; };
-		026133F32F33E67100DB394B /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 026133F22F33E67100DB394B /* MLXVLM */; };
+		02AAC8DD2F33EA91006507FF /* MLXEmbedders in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8DC2F33EA91006507FF /* MLXEmbedders */; };
+		02AAC8DF2F33EA91006507FF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8DE2F33EA91006507FF /* MLXLLM */; };
+		02AAC8E12F33EA91006507FF /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8E02F33EA91006507FF /* MLXLMCommon */; };
+		02AAC8E32F33EA91006507FF /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8E22F33EA91006507FF /* MLXVLM */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,10 +30,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				026133EF2F33E66800DB394B /* MLXLLM in Frameworks */,
-				026133F12F33E66C00DB394B /* MLXLMCommon in Frameworks */,
-				026133F32F33E67100DB394B /* MLXVLM in Frameworks */,
-				026133ED2F33E66300DB394B /* MLXEmbedders in Frameworks */,
+				02AAC8DF2F33EA91006507FF /* MLXLLM in Frameworks */,
+				02AAC8E12F33EA91006507FF /* MLXLMCommon in Frameworks */,
+				02AAC8E32F33EA91006507FF /* MLXVLM in Frameworks */,
+				02AAC8DD2F33EA91006507FF /* MLXEmbedders in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -84,10 +84,10 @@
 			);
 			name = AIEdgeApp;
 			packageProductDependencies = (
-				026133EC2F33E66300DB394B /* MLXEmbedders */,
-				026133EE2F33E66800DB394B /* MLXLLM */,
-				026133F02F33E66C00DB394B /* MLXLMCommon */,
-				026133F22F33E67100DB394B /* MLXVLM */,
+				02AAC8DC2F33EA91006507FF /* MLXEmbedders */,
+				02AAC8DE2F33EA91006507FF /* MLXLLM */,
+				02AAC8E02F33EA91006507FF /* MLXLMCommon */,
+				02AAC8E22F33EA91006507FF /* MLXVLM */,
 			);
 			productName = AIEdgeApp;
 			productReference = 02F1E9072F0BC1D5000F6016 /* AIEdgeApp.app */;
@@ -101,7 +101,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 2620;
-				LastUpgradeCheck = 2620;
+				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					02F1E9062F0BC1D5000F6016 = {
 						CreatedOnToolsVersion = 26.2;
@@ -118,7 +118,7 @@
 			mainGroup = 0FA88C332D71E675001EC521;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0FA88C3D2D71E675001EC521 /* Products */;
@@ -160,7 +160,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "AIEdgeApp/App/Preview\\ Content";
 				DEVELOPMENT_TEAM = QY7N5G244R;
 				ENABLE_APP_SANDBOX = YES;
@@ -181,7 +180,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -213,7 +212,6 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "AIEdgeApp/App/Preview\\ Content";
 				DEVELOPMENT_TEAM = QY7N5G244R;
 				ENABLE_APP_SANDBOX = YES;
@@ -234,7 +232,7 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
@@ -311,7 +309,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				LSSuppportsDownloads = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
@@ -373,7 +371,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.2;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				LSSuppportsDownloads = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
@@ -410,35 +408,35 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
+		02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm";
+			repositoryURL = "https://github.com/ml-explore/mlx-swift-lm/";
 			requirement = {
-				kind = exactVersion;
-				version = 2.29.3;
+				branch = main;
+				kind = branch;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		026133EC2F33E66300DB394B /* MLXEmbedders */ = {
+		02AAC8DC2F33EA91006507FF /* MLXEmbedders */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			package = 02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXEmbedders;
 		};
-		026133EE2F33E66800DB394B /* MLXLLM */ = {
+		02AAC8DE2F33EA91006507FF /* MLXLLM */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			package = 02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXLLM;
 		};
-		026133F02F33E66C00DB394B /* MLXLMCommon */ = {
+		02AAC8E02F33EA91006507FF /* MLXLMCommon */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			package = 02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXLMCommon;
 		};
-		026133F22F33E67100DB394B /* MLXVLM */ = {
+		02AAC8E22F33EA91006507FF /* MLXVLM */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 026133EB2F33E2B300DB394B /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
+			package = 02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXVLM;
 		};
 /* End XCSwiftPackageProductDependency section */

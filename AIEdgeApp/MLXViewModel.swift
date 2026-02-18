@@ -144,7 +144,7 @@ class MLXViewModel: NSObject {
         modelContainer = nil
         
         // Force MLX to release cached memory
-        MLX.GPU.clearCache()
+        Memory.clearCache()
         
         // Reset runtime stats / state
         tokensPerSecond = 0
@@ -359,7 +359,7 @@ class MLXViewModel: NSObject {
     /// Unloads ONLY the heavy model weights but keeps chat history
     func unloadModelResourcesOnly() {
         modelContainer = nil
-        MLX.GPU.clearCache()
+        Memory.clearCache()
         tokensPerSecond = 0
         isRunning = false
         // intentionally NOT clearing messages/chatHistory

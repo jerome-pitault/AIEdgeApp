@@ -219,8 +219,21 @@ struct ChatView: View {
     }
     #elseif(os(macOS))
     private func addImage(_ result: Result<URL, any Error>) {
-        if let url = try? result.get(), let data = try? Data(contentsOf: url) {
-            selectedImages = [data]
+        if let url = try? result.get() {
+            // Access security-scoped resource
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if accessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            
+            if let data = try? Data(contentsOf: url) {
+                selectedImages = [data]
+            } else {
+                 print("Failed to read data from URL: \(url)")
+                 selectedImages = []
+            }
         } else {
             selectedImages = []
         }
