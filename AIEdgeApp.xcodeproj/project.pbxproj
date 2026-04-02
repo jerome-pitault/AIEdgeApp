@@ -11,6 +11,16 @@
 		02AAC8DF2F33EA91006507FF /* MLXLLM in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8DE2F33EA91006507FF /* MLXLLM */; };
 		02AAC8E12F33EA91006507FF /* MLXLMCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8E02F33EA91006507FF /* MLXLMCommon */; };
 		02AAC8E32F33EA91006507FF /* MLXVLM in Frameworks */ = {isa = PBXBuildFile; productRef = 02AAC8E22F33EA91006507FF /* MLXVLM */; };
+		02D76EE02F5757960064856D /* AudioCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EDF2F5757960064856D /* AudioCommon */; };
+		02D76EE22F5757960064856D /* CosyVoiceTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EE12F5757960064856D /* CosyVoiceTTS */; };
+		02D76EE42F5757960064856D /* PersonaPlex in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EE32F5757960064856D /* PersonaPlex */; };
+		02D76EE62F5757960064856D /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EE52F5757960064856D /* Qwen3ASR */; };
+		02D76EE82F5757960064856D /* Qwen3TTS in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EE72F5757960064856D /* Qwen3TTS */; };
+		02D76EEB2F5758B90064856D /* AudioCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EEA2F5758B90064856D /* AudioCommon */; };
+		02D76EED2F5758B90064856D /* CosyVoiceTTS in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EEC2F5758B90064856D /* CosyVoiceTTS */; };
+		02D76EEF2F5758B90064856D /* PersonaPlex in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EEE2F5758B90064856D /* PersonaPlex */; };
+		02D76EF12F5758B90064856D /* Qwen3ASR in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EF02F5758B90064856D /* Qwen3ASR */; };
+		02D76EF32F5758B90064856D /* Qwen3TTS in Frameworks */ = {isa = PBXBuildFile; productRef = 02D76EF22F5758B90064856D /* Qwen3TTS */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,9 +40,19 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				02D76EE82F5757960064856D /* Qwen3TTS in Frameworks */,
 				02AAC8DF2F33EA91006507FF /* MLXLLM in Frameworks */,
+				02D76EF12F5758B90064856D /* Qwen3ASR in Frameworks */,
+				02D76EE22F5757960064856D /* CosyVoiceTTS in Frameworks */,
 				02AAC8E12F33EA91006507FF /* MLXLMCommon in Frameworks */,
+				02D76EE42F5757960064856D /* PersonaPlex in Frameworks */,
+				02D76EE62F5757960064856D /* Qwen3ASR in Frameworks */,
 				02AAC8E32F33EA91006507FF /* MLXVLM in Frameworks */,
+				02D76EE02F5757960064856D /* AudioCommon in Frameworks */,
+				02D76EEF2F5758B90064856D /* PersonaPlex in Frameworks */,
+				02D76EEB2F5758B90064856D /* AudioCommon in Frameworks */,
+				02D76EF32F5758B90064856D /* Qwen3TTS in Frameworks */,
+				02D76EED2F5758B90064856D /* CosyVoiceTTS in Frameworks */,
 				02AAC8DD2F33EA91006507FF /* MLXEmbedders in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -88,6 +108,16 @@
 				02AAC8DE2F33EA91006507FF /* MLXLLM */,
 				02AAC8E02F33EA91006507FF /* MLXLMCommon */,
 				02AAC8E22F33EA91006507FF /* MLXVLM */,
+				02D76EDF2F5757960064856D /* AudioCommon */,
+				02D76EE12F5757960064856D /* CosyVoiceTTS */,
+				02D76EE32F5757960064856D /* PersonaPlex */,
+				02D76EE52F5757960064856D /* Qwen3ASR */,
+				02D76EE72F5757960064856D /* Qwen3TTS */,
+				02D76EEA2F5758B90064856D /* AudioCommon */,
+				02D76EEC2F5758B90064856D /* CosyVoiceTTS */,
+				02D76EEE2F5758B90064856D /* PersonaPlex */,
+				02D76EF02F5758B90064856D /* Qwen3ASR */,
+				02D76EF22F5758B90064856D /* Qwen3TTS */,
 			);
 			productName = AIEdgeApp;
 			productReference = 02F1E9072F0BC1D5000F6016 /* AIEdgeApp.app */;
@@ -119,6 +149,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */,
+				02D76EE92F5758B90064856D /* XCLocalSwiftPackageReference "../qwen3-asr-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 0FA88C3D2D71E675001EC521 /* Products */;
@@ -407,6 +438,13 @@
 		};
 /* End XCConfigurationList section */
 
+/* Begin XCLocalSwiftPackageReference section */
+		02D76EE92F5758B90064856D /* XCLocalSwiftPackageReference "../qwen3-asr-swift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../qwen3-asr-swift";
+		};
+/* End XCLocalSwiftPackageReference section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -438,6 +476,46 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 02AAC8DB2F33EA91006507FF /* XCRemoteSwiftPackageReference "mlx-swift-lm" */;
 			productName = MLXVLM;
+		};
+		02D76EDF2F5757960064856D /* AudioCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AudioCommon;
+		};
+		02D76EE12F5757960064856D /* CosyVoiceTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CosyVoiceTTS;
+		};
+		02D76EE32F5757960064856D /* PersonaPlex */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PersonaPlex;
+		};
+		02D76EE52F5757960064856D /* Qwen3ASR */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Qwen3ASR;
+		};
+		02D76EE72F5757960064856D /* Qwen3TTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Qwen3TTS;
+		};
+		02D76EEA2F5758B90064856D /* AudioCommon */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AudioCommon;
+		};
+		02D76EEC2F5758B90064856D /* CosyVoiceTTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CosyVoiceTTS;
+		};
+		02D76EEE2F5758B90064856D /* PersonaPlex */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = PersonaPlex;
+		};
+		02D76EF02F5758B90064856D /* Qwen3ASR */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Qwen3ASR;
+		};
+		02D76EF22F5758B90064856D /* Qwen3TTS */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Qwen3TTS;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

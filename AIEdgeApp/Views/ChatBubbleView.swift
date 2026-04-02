@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ChatBubbleView: View {
     let bubble: ChatBubble
+    var isSpeaking: Bool = false
     var onSpeak: (() -> Void)? = nil
     
     var body: some View {
@@ -64,8 +65,10 @@ struct ChatBubbleView: View {
             if bubble.role != .user {
                 if let onSpeak = onSpeak {
                     Button(action: onSpeak) {
-                        Image(systemName: "speaker.wave.2.circle")
-                            .foregroundStyle(.secondary)
+                        Image(systemName: isSpeaking ? "stop.circle.fill" : "speaker.wave.2.circle")
+                            .symbolEffect(.pulse, isActive: isSpeaking)
+                            .foregroundStyle(isSpeaking ? .red : .blue)
+                            .font(.system(size: 24))
                     }
                     .buttonStyle(.plain)
                     .padding(.leading, 4)

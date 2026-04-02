@@ -19,48 +19,120 @@ import UIKit
 import AppKit
 #endif
 
+struct ConversationItem: Identifiable {
+    let id: UUID
+    let name: String
+    let url: URL
+    let modified: Date
+}
+
 struct ContentView: View {
-    /// All models you want to expose in the list
-    private let availableModels: [ModelConfiguration] = [
-        LLMRegistry.deepSeekR1_1_5B_4bit,
-        LLMRegistry.qwen2_5Coder_1_5B_4bit,
-        MLXVLM.VLMRegistry.qwen2_VL_2B_Instruct_4bit,
-        MLXVLM.VLMRegistry.Qwen3_VL_4B_Instruct_3bit,
-        //LLMRegistry.qwen2_VL_2B_Instruct_4bit,
-        LLMRegistry.qwen3_4B_4bit,
-        LLMRegistry.Qwen3_8B_MLX_4bit,
-        LLMRegistry.Qwen3_14B_MLX_4bit,
-        LLMRegistry.granite_4_0_h_micro_4bit,
-        //LLMRegistry.Apertus_8B_2509_4bit,
-        LLMRegistry.ministral3_3B_4bit,
-        LLMRegistry.gemma_3n_E4B_it_lm_4bit
-        //LLMRegistry.Voxtral_Mini_3B_2507_bf16
-    ]
+    @State private var conversations: [ConversationItem] = []
+    @State private var isLoading: Bool = false
 
     init() {
-        // Register custom models once
-        LLMModelFactory.shared.modelRegistry.registerCustomModels()
+        // Performance: Run heavy scans in the background to avoid blocking main thread
+        Task.detached(priority: .utility) {
+            // Cleanup abandoned downloads in tmp
+            AppLogger.clearTemporaryDirectory()
+            // Log downloaded models and files at launch
+            AppLogger.logDownloadedFiles()
+        }
+    }
+
+    private var conversationsDirectoryURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        return docs.appendingPathComponent("Conversations", isDirectory: true)
+    }
+
+    private func loadConversations() {
+        if isLoading { return }
+        isLoading = true
+        defer { isLoading = false }
+
+        let fm = FileManager.default
+        let dir = conversationsDirectoryURL
+
+        // Ensure directory exists
+        if !fm.fileExists(atPath: dir.path) {
+            do {
+                try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            } catch {
+                print("Failed to create Conversations directory: \(error)")
+            }
+        }
+
+        do {
+            let resourceKeys: [URLResourceKey] = [.contentModificationDateKey, .isDirectoryKey]
+            let urls = try fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: resourceKeys, options: [.skipsHiddenFiles])
+
+            var items: [ConversationItem] = []
+            for url in urls {
+                let values = try url.resourceValues(forKeys: Set(resourceKeys))
+                if values.isDirectory == true { continue }
+                let modified = values.contentModificationDate ?? .distantPast
+                let baseName = url.deletingPathExtension().lastPathComponent
+                guard baseName != "index" && baseName != "global_settings" else { continue }
+                guard let stableID = UUID(uuidString: baseName) else { continue }
+                let item = ConversationItem(id: stableID, name: baseName, url: url, modified: modified)
+                items.append(item)
+            }
+
+            items.sort { $0.modified > $1.modified }
+
+            DispatchQueue.main.async {
+                self.conversations = items
+            }
+        } catch {
+            print("Error loading conversations: \(error)")
+            DispatchQueue.main.async {
+                self.conversations = []
+            }
+        }
     }
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(availableModels, id: \.name) { model in
-                        NavigationLink(destination: ChatView(modelConfiguration: model)) {
-                            ModelRow(model: model, isSelected: false)
+            List(conversations) { item in
+                // Adjust ChatView initializer to match your project. This assumes a `conversationURL:` init.
+                NavigationLink(destination: {
+                    let config = ModelWithRequirement.compatible.first ?? LLMRegistry.deepSeekR1_1_5B_4bit
+                    ChatView(modelConfiguration: config, conversationId: item.id)
+                }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(item.name)
+                            .font(.headline)
+                        HStack(spacing: 6) {
+                            Image(systemName: "clock")
+                                .foregroundStyle(.secondary)
+                            Text(item.modified, style: .date)
+                                .foregroundStyle(.secondary)
+                            Text(item.modified, style: .time)
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
-                        .padding(.vertical, 8) // Tighter spacing
-                        .padding(.horizontal)
-                        
-                        Divider()
-                            .padding(.leading, 70) // Indent divider to align with text
+                        .font(.subheadline)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .overlay {
+                if conversations.isEmpty {
+                    ContentUnavailableView("No Conversations", systemImage: "text.bubble", description: Text("Your saved chats will appear here."))
+                }
+            }
+            .navigationTitle("Conversations")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    NavigationLink(destination: {
+                        let config = ModelWithRequirement.compatible.first ?? LLMRegistry.deepSeekR1_1_5B_4bit
+                        ChatView(modelConfiguration: config, conversationId: nil)
+                    }) {
+                        Image(systemName: "plus")
                     }
                 }
-                .padding(.vertical, 8)
             }
-            .navigationTitle("Models")
+            .refreshable { loadConversations() }
+            .onAppear { loadConversations() }
         }
     }
 }
@@ -68,4 +140,3 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
-

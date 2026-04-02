@@ -10,11 +10,26 @@ import MLXLLM
 import MLXVLM
 import MLXLMCommon
 import PhotosUI
+import MLX
+
+struct HashableModelConfiguration: Hashable, Identifiable {
+    let base: ModelConfiguration
+    var id: String { base.name } // use model name as identifier (unique enough for display)
+    
+    static func ==(lhs: HashableModelConfiguration, rhs: HashableModelConfiguration) -> Bool {
+        lhs.base.name == rhs.base.name
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(base.name)
+    }
+}
 
 struct ChatView: View {
     let modelConfiguration: ModelConfiguration
     
     @State private var vm: MLXViewModel
+    @State private var selectedModel: HashableModelConfiguration
     @State private var prompt: String = ""
     @State private var selectedImages: [Data] = []
     
@@ -25,27 +40,59 @@ struct ChatView: View {
     @FocusState private var isFocused: Bool
     
     @State private var generationTask: Task<Void, Never>?
-
-    private var displayName: String {
-        if let lastPart = modelConfiguration.name.split(separator: "/").last {
-            return String(lastPart)
-        }
-        return modelConfiguration.name
-    }
     
-    init(modelConfiguration: ModelConfiguration) {
+    init(modelConfiguration: ModelConfiguration, conversationId: UUID? = nil) {
         self.modelConfiguration = modelConfiguration
-        _vm = State(initialValue: MLXViewModel(modelConfiguration: modelConfiguration))
+        _vm = State(initialValue: MLXViewModel(modelConfiguration: modelConfiguration, conversationId: conversationId))
+        let initial = HashableModelConfiguration(base: modelConfiguration)
+        _selectedModel = State(initialValue: initial)
     }
     
+    private var compatibleModels: [HashableModelConfiguration] {
+        ModelWithRequirement.compatible.map { HashableModelConfiguration(base: $0) }
+    }
     
     var body: some View {
         VStack {
+            VStack(spacing: 2) {
+                Picker("Model", selection: $selectedModel) {
+                    ForEach(compatibleModels) { config in
+                        let nameParts = config.base.name.split(separator: "/")
+                        let displayName = nameParts.last.map(String.init) ?? config.base.name
+                        Text(displayName)
+                            .tag(config)
+                    }
+                }
+                .onChange(of: selectedModel) { _, newSelection in
+                    Task {
+                        await vm.unloadModel() // Unload the old model and clear state
+                        vm.modelConfiguration = newSelection.base
+                        Memory.clearCache()
+                        await vm.loadConversation() // Load any existing conversation for the new model
+                    }
+                }
+                .pickerStyle(.menu)
+                .font(.headline)
+                
+                Text("\(vm.tokensPerSecond, format: .number.precision(.fractionLength(2))) t/s • \(vm.memoryStats)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top)
+            
             ScrollViewReader { proxy in
                 ScrollView {
                     VStack(spacing: 12) {
                         ForEach(vm.chatHistory) { bubble in
-                            ChatBubbleView(bubble: bubble)
+                            ChatBubbleView(
+                                bubble: bubble,
+                                isSpeaking: vm.speechManager.currentlySpeakingId == bubble.id && (vm.speechManager.isSynthesizing || vm.speechManager.ttsManager.isLoading),
+                                onSpeak: {
+                                    Task {
+                                        await vm.toggleSpeak(id: bubble.id, text: bubble.content)
+                                    }
+                                }
+                            )
                         }
                     }
                     .padding()
@@ -128,9 +175,21 @@ struct ChatView: View {
                     .padding(.trailing, 4)
                 }
 
-                TextField("Prompt", text: $prompt)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($isFocused)
+                HStack(spacing: 8) {
+                    Button {
+                        vm.toggleListening()
+                    } label: {
+                        Image(systemName: vm.speechManager.isRecording ? "mic.fill" : "mic")
+                            .font(.system(size: 20))
+                            .foregroundStyle(vm.speechManager.isRecording ? .red : .blue)
+                            .frame(width: 30, height: 30) // Minimum touch target size
+                    }
+                    .buttonStyle(.plain)
+
+                    TextField("Prompt", text: $prompt)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($isFocused)
+                }
 
                 Button(action: generate) {
                     Image(systemName: "paperplane.fill")
@@ -146,6 +205,7 @@ struct ChatView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .toolbar {
+            /*
             ToolbarItem(placement: .principal) {
                 VStack(spacing: 2) {
                     Text(displayName)
@@ -155,6 +215,7 @@ struct ChatView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            */
             
             if let errorMessage = vm.errorMessage {
                 ToolbarItem {
@@ -194,6 +255,11 @@ struct ChatView: View {
         #elseif(os(macOS))
         .fileImporter(isPresented: $showingPhotoPicker, allowedContentTypes: [.image], onCompletion: addImage)
         #endif
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ASRTranscriptionReceived"))) { notification in
+            if let text = notification.object as? String {
+                self.prompt = text
+            }
+        }
     }
     
     private func generate() {
@@ -246,3 +312,4 @@ struct ChatView: View {
         (vm.downloadProgress != nil && !vm.downloadProgress!.isFinished)
     }
 }
+

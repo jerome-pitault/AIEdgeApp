@@ -51,6 +51,18 @@ extension AbstractModelRegistry {
         defaultPrompt: "List five interesting facts about black holes"
     )
     
+    static let Qwen3_5_9B_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3.5-9B-4bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
+    static let Devstral_Small_2507_MLX_4bit = ModelConfiguration(
+        id: "lmstudio-community/Devstral-Small-2507-MLX-4bit",
+        overrideTokenizer: "PreTrainedTokenizer",
+        defaultPrompt: "List five interesting facts about black holes"
+    )
+    
     static let Apertus_8B_2509_4bit = ModelConfiguration(
         id: "mlx-community/Apertus-8B-2509-4bit",
         overrideTokenizer: "PreTrainedTokenizer",
@@ -89,6 +101,7 @@ extension AbstractModelRegistry {
             Self.qwen3_4B_4bit,
             Self.Qwen3_8B_MLX_4bit,
             Self.Qwen3_14B_MLX_4bit,
+            Self.Qwen3_5_9B_4bit,
             // Self.Apertus_8B_2509_4bit,
             //Self.qwen2_VL_2B_Instruct_4bit,
             Self.ministral3_3B_4bit,

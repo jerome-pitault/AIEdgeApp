@@ -31,6 +31,9 @@ class MLXViewModel: NSObject {
     /// for predefined models.
     var modelConfiguration: ModelConfiguration
 
+    /// Unique identifier for the current conversation
+    private let conversationId: UUID
+
     /// The model container is used to generate language model output.
     ///
     /// The model container should be loaded via ``ModelFactory.laodContainer`` method.
@@ -114,6 +117,15 @@ class MLXViewModel: NSObject {
         }
     }
 
+    /// Unloads ONLY the heavy model weights but keeps chat history
+    public func unloadModelResourcesOnly() {
+        modelContainer = nil
+        Memory.clearCache()
+        tokensPerSecond = 0
+        isRunning = false
+        // intentionally NOT clearing messages/chatHistory
+    }
+    
     /// The download base directory for models
     private var downloadBaseURL: URL {
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
@@ -132,12 +144,25 @@ class MLXViewModel: NSObject {
     /// Whether web search is enabled
     var isSearchEnabled = true
     
+    /// Speech manager for ASR and TTS
+    var speechManager = SpeechManager()
+    
+    /// Toggle TTS for a specific bubble, unloading LLM first if needed
+    func toggleSpeak(id: UUID, text: String) async {
+        // If we are starting new speech, unload LLM to free memory
+        if speechManager.currentlySpeakingId != id || !speechManager.isSynthesizing {
+            unloadModelResourcesOnly()
+        }
+        
+        await speechManager.toggleSpeak(id: id, text: text)
+    }
+
     /// Flag to track if we need to reload the model when returning to foreground
     private var shouldReloadOnForeground = false
 
     
     /// Explicitly unloads the current model from memory
-    func unloadModel() {
+    public func unloadModel() {
         print("DEBUG: unloadModel called")
         
         // Drop the model container so its memory can be reclaimed
@@ -156,11 +181,10 @@ class MLXViewModel: NSObject {
         // Clear conversation history
         // Save before clearing - CAPTURE HISTORY FIRST
         let currentHistory = self.chatHistory
-        let modelName = self.modelConfiguration.name
         
         Task {
             if !currentHistory.isEmpty {
-                 await ConversationPersistence.shared.save(history: currentHistory, for: modelName)
+                 await ConversationPersistence.shared.saveHistory(currentHistory, for: conversationId)
             }
         }
         
@@ -170,18 +194,17 @@ class MLXViewModel: NSObject {
     
     /// Loads the conversation history for the current model
     func loadConversation() async {
-        let modelName = modelConfiguration.name
-        print("DEBUG: Loading conversation for \(modelName)")
+        print("DEBUG: Loading conversation for \(modelConfiguration.name)")
         
         // Load Settings First
-        if let settings = await ConversationPersistence.shared.loadSettings(for: modelName) {
+        if let settings = await ConversationPersistence.shared.loadSettings() {
             await MainActor.run {
                 self.modelSettings = settings
-                print("DEBUG: Loaded settings for \(modelName)")
+                print("DEBUG: Loaded settings")
             }
         }
         
-        if let history = await ConversationPersistence.shared.load(for: modelName) {
+        if let history = await ConversationPersistence.shared.loadHistory(for: conversationId) {
             await MainActor.run {
                 self.chatHistory = history
                 // Rebuild LLM context from history
@@ -193,30 +216,26 @@ class MLXViewModel: NSObject {
     
     /// Saves the current conversation history and settings
     func saveConversation() async {
-        let modelName = modelConfiguration.name
         let history = await MainActor.run { self.chatHistory }
         let settings = await MainActor.run { self.modelSettings }
         
         if !history.isEmpty {
-           // print("DEBUG: Saving conversation for \(modelName)")
-            await ConversationPersistence.shared.save(history: history, for: modelName)
+           // print("DEBUG: Saving conversation")
+            await ConversationPersistence.shared.saveHistory(history, for: conversationId)
         }
         
         // Save settings too
-        await ConversationPersistence.shared.saveSettings(settings, for: modelName)
+        await ConversationPersistence.shared.saveSettings(settings)
     }
     
     /// Explicitly save settings (useful for UI updates)
     func saveSettings() async {
-        let modelName = modelConfiguration.name
         let settings = await MainActor.run { self.modelSettings }
-        await ConversationPersistence.shared.saveSettings(settings, for: modelName)
+        await ConversationPersistence.shared.saveSettings(settings)
     }
     
     /// Clear conversation history for this model
     func clearConversation() async {
-        let modelName = modelConfiguration.name
-        
         // Clear in-memory conversation
         await MainActor.run {
             self.chatHistory.removeAll()
@@ -224,7 +243,7 @@ class MLXViewModel: NSObject {
         }
         
         // Delete persisted conversation on disk
-        await ConversationPersistence.shared.delete(for: modelName)
+        await ConversationPersistence.shared.deleteHistory(for: conversationId)
     }
     
     /// Rebuilds the LLM 'messages' array from the UI 'chatHistory'
@@ -273,10 +292,14 @@ class MLXViewModel: NSObject {
         }
     }
 
-    init(modelConfiguration: ModelConfiguration) {
+    init(modelConfiguration: ModelConfiguration, conversationId: UUID? = nil) {
         print("DEBUG: MLXViewModel INIT - \(modelConfiguration.name)")
         // Initialize stored properties before super.init()
         self.modelConfiguration = modelConfiguration
+        
+        // TODO: For persistent threads per model, use a stable UUID per model name.
+        // For now, generate a fresh UUID per instance.
+        self.conversationId = conversationId ?? UUID()
         
         // Initialize hub - compute downloadBase first
         let paths = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
@@ -314,16 +337,13 @@ class MLXViewModel: NSObject {
         
         // Set delegate after super.init()
        // speechSynthesizer.delegate = self
-        
-        // Ensure the download directory exists (now safe to call after super.init())
-        createDownloadDirectoryIfNeeded()
-        // Ensure the download directory exists (now safe to call after super.init())
+        // Ensure the download directory exists
         createDownloadDirectoryIfNeeded()
         
         // Setup lifecycle and memory monitoring
         setupLifecycleObservers()
         
-        // Removed eager loading in init, now handled by ChatView.task
+        // Removed eager loading in init, now handled on-demand
     }
     
     private func setupLifecycleObservers() {
@@ -356,14 +376,7 @@ class MLXViewModel: NSObject {
         }
     }
     
-    /// Unloads ONLY the heavy model weights but keeps chat history
-    func unloadModelResourcesOnly() {
-        modelContainer = nil
-        Memory.clearCache()
-        tokensPerSecond = 0
-        isRunning = false
-        // intentionally NOT clearing messages/chatHistory
-    }
+
     
     deinit {
         print("DEBUG: MLXViewModel DEINIT")
@@ -471,18 +484,13 @@ class MLXViewModel: NSObject {
         do {
             logMemoryUsage("Start loadModel")
             
-            // Debug: Print model configuration
-            print("Loading model: \(modelConfiguration.name)")
-            print("Model ID: \(modelConfiguration.id)")
-            
-            // Debug: Check if model directory exists
-           /* let modelIdString = modelConfiguration.name
+            let modelIdString = modelConfiguration.name
             let modelDirName: String
             if modelIdString.hasPrefix("mlx-community/") {
                 modelDirName = String(modelIdString.dropFirst("mlx-community/".count))
             } else {
                 modelDirName = modelIdString
-            } */
+            }
             
             // 1. Check Nested Path: huggingface/models/models/owner/repo
             // This matches the structure seen in the user's logs
@@ -521,7 +529,7 @@ class MLXViewModel: NSObject {
             let exists = FileManager.default.fileExists(atPath: expectedModelPath.path())
             print("Final resolved model path: \(expectedModelPath.path())")
             print("Model directory exists: \(exists)")
-            /*
+
             // Check for cache directories that might have old data
             let cachePath = expectedModelPath.appending(path: ".cache")
             if FileManager.default.fileExists(atPath: cachePath.path()) {
@@ -549,7 +557,6 @@ class MLXViewModel: NSObject {
                     }
                 }
             }
-            */
             // Try loading - the download should start if files don't exist
             print("Attempting to load model (download will start if needed)...")
             
@@ -632,6 +639,10 @@ class MLXViewModel: NSObject {
         Swift.print("DEBUG: generate called. Prompt len: \(prompt.count), Images: \(images.count)")
         isRunning = true
         self.output = "" // Clear previous output immediately
+
+        // 0. UNLOAD Speech models to save memory for LLM
+        speechManager.asrManager.unloadModel()
+        speechManager.ttsManager.unloadModel()
 
         // 1. Inject System Prompt if new conversation
         if self.messages.isEmpty {
@@ -784,7 +795,7 @@ class MLXViewModel: NSObject {
                         // DEBUG: Print messages being sent to model
                         print("DEBUG: ===== MESSAGES SENT TO MODEL =====")
                         for (idx, msg) in sanitizedMessages.enumerated() {
-                            print("DEBUG: Message \(idx): \(msg)")
+                          //  print("DEBUG: Message \(idx): \(msg)")
                         }
                         print("DEBUG: =====================================")
                         
@@ -811,7 +822,7 @@ class MLXViewModel: NSObject {
                             if Task.isCancelled { return .stop }
                             
                             // DEBUG: Print tokens
-                            print("DEBUG: NEW TOKENS: \(tokens)")
+                            // print("DEBUG: NEW TOKENS: \(tokens)")
                             
                             let text = context.tokenizer.decode(tokens: tokens)
                             finalOutput = text
@@ -822,7 +833,7 @@ class MLXViewModel: NSObject {
                                 print("DEBUG TEXT BYTE COUNT: \(text.utf8.count)")
                                 print("DEBUG TEXT CHARACTER COUNT: \(text.count)")
                             }
-                            
+             
                             Task { @MainActor in
                                 self.output = text
                                 
@@ -991,12 +1002,18 @@ class MLXViewModel: NSObject {
             // Auto-save after final answer
             await self.saveConversation()
             
+            // Automatically speak the final response
+            if !currentOutput.isEmpty {
+                await speechManager.speak(text: currentOutput)
+            }
+            
             shouldContinue = false
         }
         
         await MainActor.run {
             self.isRunning = false
         }
+        
         logMemoryUsage("DEBUG: generate finished")
     }
     
@@ -1022,7 +1039,36 @@ class MLXViewModel: NSObject {
         }
     }
 
-    // Speech methods removed
+    // Speech methods
+    func toggleListening() {
+        if speechManager.isRecording {
+            Task {
+                let transcription = await speechManager.stopListening()
+                
+                // UNLOAD ASR model to free up RAM for LLM
+                speechManager.asrManager.unloadModel()
+                
+                if !transcription.isEmpty {
+                    // This will be handled in the View to update the prompt
+                    NotificationCenter.default.post(name: NSNotification.Name("ASRTranscriptionReceived"), object: transcription)
+                }
+            }
+        } else {
+            Task {
+                do {
+                    // UNLOAD LLM model to free up RAM for ASR
+                    unloadModelResourcesOnly()
+                    
+                    // LOAD ASR model on demand
+                    try await speechManager.asrManager.loadModel()
+                    try await speechManager.startListening()
+                } catch {
+                    print("Failed to start listening: \(error)")
+                    errorMessage = "Failed to load speech model: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
     
     /// Creates ``UserInput.Prompt`` from prompt string and images
     ///

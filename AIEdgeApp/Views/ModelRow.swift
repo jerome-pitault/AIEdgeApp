@@ -18,6 +18,7 @@ struct ModelRow: View {
     let isSelected: Bool
     
     @State private var modelSize: String?
+    @State private var lastExchange: String?
     
     // Computed property to strip the prefix (e.g., "mlx-community/")
     var displayName: String {
@@ -60,10 +61,20 @@ struct ModelRow: View {
                     .font(.headline)
                     .lineLimit(1)
                 
-                if let size = modelSize {
-                    Text(size)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    if let size = modelSize {
+                        Text(size)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: true, vertical: false)
+                    }
+                    
+                    if let preview = lastExchange {
+                        Text("• \(preview)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
             }
             
@@ -73,6 +84,33 @@ struct ModelRow: View {
         .contentShape(Rectangle()) // Make full row tappable
         .task {
             calculateSize()
+            await fetchLastExchange()
+        }
+    }
+    
+    private func fetchLastExchange() async {
+        // 1. Find the latest conversation for this model
+        let conversations = ConversationPersistence.shared.loadConversations()
+        guard let conversation = conversations.first(where: { $0.modelName == model.name }) else {
+            return
+        }
+        // 2. Load the chat bubble history
+        guard let history = ConversationPersistence.shared.loadHistory(for: conversation.id), let lastBubble = history.last else {
+            return
+        }
+        var text = lastBubble.content
+        // Skip <think> block if it exists
+        if text.lowercased().contains("<think>") {
+            if let range = text.range(of: "</think>", options: String.CompareOptions.caseInsensitive) {
+                text = String(text[range.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            } else if text.lowercased().hasPrefix("<think>") {
+                // If it starts with <think> but no closing tag, remove the opening tag
+                text = text.replacingOccurrences(of: "<think>", with: "", options: String.CompareOptions.anchored)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        }
+        if !text.isEmpty {
+            lastExchange = text
         }
     }
     
@@ -134,3 +172,4 @@ extension FileManager {
         return accumulatedSize
     }
 }
+

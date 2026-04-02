@@ -2,7 +2,7 @@
 //  ChatBubble.swift
 //  AIEdgeApp
 //
-//  Created by AI Agent.
+//  Created by Jérôme Pitault on 09.02.2026
 //
 
 import Foundation

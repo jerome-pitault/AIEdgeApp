@@ -2,7 +2,7 @@
 //  ConversationPersistence.swift
 //  AIEdgeApp
 //
-//  Created by AI Agent.
+//  Created by Jérôme Pitault on 09.03.2026
 //
 
 import Foundation
@@ -42,14 +42,81 @@ actor ConversationPersistence {
         return conversationsURL
     }
     
-    private func getFileURL(for modelName: String) -> URL {
-        // Sanitize model name for filename safety
-        let safeName = modelName.replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "_")
-        return conversationsDirectory.appending(path: "\(safeName).json")
+    private var indexFileURL: URL {
+        conversationsDirectory.appending(path: "index.json")
+    }
+
+    // MARK: - Conversation Index Metadata
+    
+    func loadConversations() -> [Conversation] {
+        guard fileManager.fileExists(atPath: indexFileURL.path()) else {
+            return []
+        }
+        
+        do {
+            let data = try Data(contentsOf: indexFileURL)
+            let conversations = try jsonDecoder.decode([Conversation].self, from: data)
+            // Sort by most recently updated
+            return conversations.sorted { $0.updatedAt > $1.updatedAt }
+        } catch {
+            print("Failed to load conversations index: \(error)")
+            return []
+        }
     }
     
-    func save(history: [ChatBubble], for modelName: String) {
+    func saveConversations(_ conversations: [Conversation]) {
+        do {
+            let data = try jsonEncoder.encode(conversations)
+            try data.write(to: indexFileURL, options: .atomic)
+        } catch {
+            print("Failed to save conversations index: \(error)")
+        }
+    }
+    
+    func addConversation(_ conversation: Conversation) {
+        var all = loadConversations()
+        // Replace if exists
+        if let index = all.firstIndex(where: { $0.id == conversation.id }) {
+            all[index] = conversation
+        } else {
+            all.append(conversation)
+        }
+        saveConversations(all)
+    }
+    
+    func updateConversationSummary(id: UUID, newSummary: String) {
+        var all = loadConversations()
+        if let index = all.firstIndex(where: { $0.id == id }) {
+            all[index].summary = newSummary
+            all[index].updatedAt = Date()
+            saveConversations(all)
+        }
+    }
+
+    func updateConversationModel(id: UUID, newModelName: String) {
+        var all = loadConversations()
+        if let index = all.firstIndex(where: { $0.id == id }) {
+            all[index].modelName = newModelName
+            all[index].updatedAt = Date()
+            saveConversations(all)
+        }
+    }
+    
+    func deleteConversation(id: UUID) {
+        var all = loadConversations()
+        all.removeAll { $0.id == id }
+        saveConversations(all)
+        
+        deleteHistory(for: id)
+    }
+    
+    // MARK: - Message History
+    
+    private func getFileURL(for conversationId: UUID) -> URL {
+        return conversationsDirectory.appending(path: "\(conversationId.uuidString).json")
+    }
+    
+    func saveHistory(_ history: [ChatBubble], for conversationId: UUID) {
         let snapshots = history.map { bubble in
             ChatBubbleSnapshot(
                 id: bubble.id,
@@ -62,16 +129,23 @@ actor ConversationPersistence {
         
         do {
             let data = try jsonEncoder.encode(snapshots)
-            let fileURL = getFileURL(for: modelName)
+            let fileURL = getFileURL(for: conversationId)
             try data.write(to: fileURL, options: .atomic)
-            print("Saved conversation for \(modelName) to \(fileURL.path())")
+            print("Saved history for \(conversationId) to \(fileURL.path())")
+            
+            // Auto update modified date in index
+            var all = loadConversations()
+            if let index = all.firstIndex(where: { $0.id == conversationId }) {
+                all[index].updatedAt = Date()
+                saveConversations(all)
+            }
         } catch {
-            print("Failed to save conversation for \(modelName): \(error)")
+            print("Failed to save history for \(conversationId): \(error)")
         }
     }
     
-    func load(for modelName: String) -> [ChatBubble]? {
-        let fileURL = getFileURL(for: modelName)
+    func loadHistory(for conversationId: UUID) -> [ChatBubble]? {
+        let fileURL = getFileURL(for: conversationId)
         
         guard fileManager.fileExists(atPath: fileURL.path()) else {
             return nil
@@ -90,13 +164,13 @@ actor ConversationPersistence {
                 )
             }
         } catch {
-            print("Failed to load conversation for \(modelName): \(error)")
+            print("Failed to load history for \(conversationId): \(error)")
             return nil
         }
     }
     
-    func delete(for modelName: String) {
-        let fileURL = getFileURL(for: modelName)
+    func deleteHistory(for conversationId: UUID) {
+        let fileURL = getFileURL(for: conversationId)
         
         guard fileManager.fileExists(atPath: fileURL.path()) else {
             return
@@ -104,34 +178,32 @@ actor ConversationPersistence {
         
         do {
             try fileManager.removeItem(at: fileURL)
-            print("Deleted conversation for \(modelName)")
+            print("Deleted history for \(conversationId)")
         } catch {
-            print("Failed to delete conversation for \(modelName): \(error)")
+            print("Failed to delete history for \(conversationId): \(error)")
         }
     }
     
     
     // MARK: - Settings Persistence
     
-    private func getSettingsFileURL(for modelName: String) -> URL {
-        let safeName = modelName.replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: ":", with: "_")
-        return conversationsDirectory.appending(path: "\(safeName)_settings.json")
+    private func getSettingsFileURL() -> URL {
+        return conversationsDirectory.appending(path: "global_settings.json")
     }
     
-    func saveSettings(_ settings: ModelSettings, for modelName: String) {
+    func saveSettings(_ settings: ModelSettings) {
         do {
             let data = try jsonEncoder.encode(settings)
-            let fileURL = getSettingsFileURL(for: modelName)
+            let fileURL = getSettingsFileURL()
             try data.write(to: fileURL, options: .atomic)
-            print("Saved settings for \(modelName) to \(fileURL.path())")
+            print("Saved global settings to \(fileURL.path())")
         } catch {
-            print("Failed to save settings for \(modelName): \(error)")
+            print("Failed to save settings: \(error)")
         }
     }
     
-    func loadSettings(for modelName: String) -> ModelSettings? {
-        let fileURL = getSettingsFileURL(for: modelName)
+    func loadSettings() -> ModelSettings? {
+        let fileURL = getSettingsFileURL()
         
         guard fileManager.fileExists(atPath: fileURL.path()) else {
             return nil
@@ -141,7 +213,7 @@ actor ConversationPersistence {
             let data = try Data(contentsOf: fileURL)
             return try jsonDecoder.decode(ModelSettings.self, from: data)
         } catch {
-            print("Failed to load settings for \(modelName): \(error)")
+            print("Failed to load settings: \(error)")
             return nil
         }
     }
@@ -155,3 +227,4 @@ struct ModelSettings: Codable, Equatable {
         systemPrompt: "You are a helpful assistant with access to a web search tool. To use it, start your response with 'SEARCH: <query>'. Stop generating after issuing the command. I will parse the results and give them to you."
     )
 }
+

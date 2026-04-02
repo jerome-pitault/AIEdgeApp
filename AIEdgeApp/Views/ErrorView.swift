@@ -2,7 +2,7 @@
 //  ErrorView.swift
 //  AIEdgeApp
 //
-//  Created by İbrahim Çetin on 28.12.2025.
+//  Created by Jérôme Pitault on 28.12.2025.
 //
 
 import SwiftUI
